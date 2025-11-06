@@ -9,19 +9,18 @@ const ChatRoomModel = require('./models/chatroomModel');
 const MessagesModel = require('./models/Messages');
 const app = express();
 
-const {Server} = require("socket.io");
-const http = require('http')
+const { Server } = require("socket.io");
+const http = require('http');
 const server = http.createServer(app)
-const {verifyToken} = require('./verifyToken');
-
-
+const { verifyToken } = require('./verifyToken');
+const validator = require('validator');
 
 app.use(cors())
 dotenv.config()
-const io = new Server(server,{
-    cors:{
+const io = new Server(server, {
+    cors: {
         origin: 'http://localhost:5173',
-        methods:["POST","GET"]
+        methods: ["POST", "GET"]
     }
 })
 io.sockets.setMaxListeners(50);
@@ -30,15 +29,15 @@ app.use(express.json())
 
 mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log("MongoDB connected"))
-    .catch((err)=> console.log("Error Connecting to DB: ", err))
+    .catch((err) => console.log("Error Connecting to DB: ", err))
 
-app.get('/users', async (req, res)=>{
-    try{
+app.get('/users', async (req, res) => {
+    try {
         const users = await UserModel.find({});
 
         return res.status(200).json(users)
-    } catch (err){
-        res.status(500).json({message:"Error fetching users"})
+    } catch (err) {
+        res.status(500).json({ message: "Error fetching users" })
     }
 
 })
@@ -83,12 +82,16 @@ app.get('/users', async (req, res)=>{
 //     }
 // });
 
-app.post('/registration', async (req,res)=>{
-    const {username, email,password} = req.body;
+app.post('/registration', async (req, res) => {
+    const { username, email, password } = req.body;
 
-    try{
+    try {
         const salt = await bcrypt.genSalt(10)
         const hashedPassword = await bcrypt.hash(password, salt);
+
+        if (!validator.isEmail(email)) {
+            res.status(400).json({ message: "Invalid email" })
+        }
 
         const newUser = await UserModel.create({
             username,
@@ -96,38 +99,38 @@ app.post('/registration', async (req,res)=>{
             password: hashedPassword
         });
 
-        return res.status(200).json(newUser);
-    } catch(err){
-        return res.status(400).json({message:"Error registering user. ", err})
+        return res.status(201).json(newUser);
+    } catch (err) {
+        return res.status(400).json({ message: "Error registering user. ", err })
     }
 })
 
-app.post('/login', async (req,res)=>{
-    const {username, password} = req.body;
+app.post('/login', async (req, res) => {
+    const { username, password } = req.body;
 
-    try{
-        const user = await UserModel.findOne({username}).select('+password');
-        if(!user){
-            return res.status(400).json({message: "Username or password is incorrect."})
+    try {
+        const user = await UserModel.findOne({ username }).select('+password');
+        if (!user) {
+            return res.status(400).json({ message: "Username or password is incorrect." })
         }
         const isMatch = await bcrypt.compare(password, user.password)
-        if(!isMatch){
-            return res.status(400).json({message:"Incorrect Password"})
+        if (!isMatch) {
+            return res.status(400).json({ message: "Incorrect Password" })
         }
         const token = jwt.sign(
-            {id: user._id, username: user.username},
+            { id: user._id, username: user.username },
             process.env.SECRET_KEY,
-            {expiresIn: '1h'}
+            { expiresIn: '1h' }
         );
-        const userResponse = {id: user._id,username: user.username, email: user.password};
+        const userResponse = { id: user._id, username: user.username, email: user.password };
         return res.json({
-            message:"Login Successful",
-            token:token,
+            message: "Login Successful",
+            token: token,
             user: userResponse
         })
-    }catch(err){
+    } catch (err) {
         console.log("Error Logging in ", err)
-        res.status(500).json({message:"Server error during login"})
+        res.status(500).json({ message: "Server error during login" })
     }
 })
 
@@ -136,8 +139,8 @@ app.post('/login', async (req,res)=>{
 const onlineUsers = new Map()
 
 // Create chat rooms
-app.post('/create-chatroom', verifyToken, async (req, res)=>{
-    const {chatroomName, description, isPrivate, invitedUsers} = req.body;
+app.post('/create-chatroom', verifyToken, async (req, res) => {
+    const { chatroomName, description, isPrivate, invitedUsers } = req.body;
     // const username = req.user.username;
 
     const username = req.user?.username;
@@ -146,18 +149,18 @@ app.post('/create-chatroom', verifyToken, async (req, res)=>{
     console.log("User:", req.user);
 
     console.log(`backend received ${chatroomName},${description}, ${isPrivate} and ${invitedUsers}`)
-    try{
+    try {
         const newRoom = await ChatRoomModel.create({
             chatroomName,
             description,
             isPrivate: isPrivate || false,
             owner: username,
             members: [username],
-            invitedUsers:invitedUsers
+            invitedUsers: invitedUsers
         })
 
         res.status(200).json(newRoom);
-    }catch(err){
+    } catch (err) {
         console.error("Error creating room:", err);
 
         if (err.code === 11000) {
@@ -171,22 +174,22 @@ app.post('/create-chatroom', verifyToken, async (req, res)=>{
     }
 })
 
-app.post('/room/:roomID/join',verifyToken, async (req, res)=>{
-    const {roomID} = req.params;
+app.post('/room/:roomID/join', verifyToken, async (req, res) => {
+    const { roomID } = req.params;
     const username = req.user?.username;
 
     console.log(`Join request: roomID=${roomID}, user=${username}`);
 
-    try{
+    try {
         const room = await ChatRoomModel.findById(roomID)
 
-        if(!room){
-            res.status(400).json({message: "Room does not exist"})
+        if (!room) {
+            res.status(400).json({ message: "Room does not exist" })
         }
 
-        if(room.isPrivate && !room.invitedUsers.includes(username) && !room.members.includes(username)){
-            res.status(400).json({message:"User not allowed in private room"})
-        }else{
+        if (room.isPrivate && !room.invitedUsers.includes(username) && !room.members.includes(username)) {
+            res.status(400).json({ message: "User not allowed in private room" })
+        } else {
             const updateResult = await ChatRoomModel.updateOne(
                 { _id: roomID },
                 { $addToSet: { members: username } }
@@ -200,19 +203,19 @@ app.post('/room/:roomID/join',verifyToken, async (req, res)=>{
             res.status(200).json({ message: "Joined room successfully", room });
         }
 
-    } catch (err){
+    } catch (err) {
         res.status(400).json({ message: "Error joining room" });
     }
 })
 
 // Retrieves Chat rooms
-app.get('/rooms', async (req, res)=>{
-    try{
-        const rooms = await ChatRoomModel.find({isPrivate: false});
+app.get('/rooms', async (req, res) => {
+    try {
+        const rooms = await ChatRoomModel.find({ isPrivate: false });
 
         res.status(200).json(rooms)
-    } catch{
-        res.status(400).json({message: "Error getting rooms"})
+    } catch {
+        res.status(400).json({ message: "Error getting rooms" })
     }
 })
 
@@ -228,35 +231,35 @@ app.get('/room/:roomID', verifyToken, async (req, res) => {
     }
 });
 
-app.get('/room/:roomID/messages', verifyToken, async (req, res)=>{
-    try{
-        const message = await MessagesModel.find({room: req.params.roomID}).sort({createdAt: 1})
+app.get('/room/:roomID/messages', verifyToken, async (req, res) => {
+    try {
+        const message = await MessagesModel.find({ room: req.params.roomID }).sort({ createdAt: 1 })
         res.status(200).json(message)
-    } catch(err){
-        res.status(400).json({message:"Error fetching messages,", err})
+    } catch (err) {
+        res.status(400).json({ message: "Error fetching messages,", err })
     }
 
 })
 
-io.use((socket, next)=>{
+io.use((socket, next) => {
     const token = socket.handshake.auth?.token;
     console.log(`Socket auth attempt: token=${token ? 'present' : 'missing'}`);
     if (!token) {
         console.log('Socket auth failed: No token provided');
         return next(new Error('Authentication error: No token'));
     }
-    try{
+    try {
         const decoded = jwt.verify(token, process.env.SECRET_KEY)
         socket.userId = decoded.id;
         socket.username = decoded.username
         // socket.user = decoded;
         next()
-    } catch(err){
+    } catch (err) {
         next(new Error('Invalid Token'));
     }
 })
 
-io.on('connection',(socket)=>{
+io.on('connection', (socket) => {
     console.log(`User Connected ${socket.id}, ${socket.username}`);
 
     socket.on('join_room', (roomID) => {
@@ -267,8 +270,8 @@ io.on('connection',(socket)=>{
     // onlineUsers.set(socket.userId, {username: socket.username, socketId: socket.id})
     // io.emit('onlineUsers', Array.from(onlineUsers.values()))
 
-    io.on('connection',(socket)=>{
-        onlineUsers.set(socket.userId, {username: socket.username, socketId: socket.id})
+    io.on('connection', (socket) => {
+        onlineUsers.set(socket.userId, { username: socket.username, socketId: socket.id })
         io.emit('onlineUsers', Array.from(onlineUsers.values()))
     });
 
@@ -277,7 +280,7 @@ io.on('connection',(socket)=>{
     });
 
     socket.on('send_message', async (messageData) => {
-        try{
+        try {
             // save to database
             const newMessage = await MessagesModel.create({
                 room: messageData.room,
@@ -291,16 +294,16 @@ io.on('connection',(socket)=>{
                 sender: socket.username,
                 time: new Date(newMessage.createdAt).toLocaleTimeString()
             }
-            socket.to(messageData.room).emit('receive_message',fullMessage);
+            socket.to(messageData.room).emit('receive_message', fullMessage);
             socket.emit('message_sent', fullMessage);
             console.log("Message saved to DB and broad casted to chat.")
-        } catch(err){
+        } catch (err) {
             console.log("Error sending message")
-            socket.emit('error','failed to send message')
+            socket.emit('error', 'failed to send message')
         }
     });
 
-    socket.on('disconnect', ()=>{
+    socket.on('disconnect', () => {
         // console.log("User Disconnected")
         onlineUsers.delete(socket.userId)
 
@@ -312,7 +315,7 @@ io.on('connection',(socket)=>{
 
 
 const PORT = process.env.PORT || 5000
-server.listen(PORT,()=>{
+server.listen(PORT, () => {
     console.log(`Server is running at ${PORT}`)
 })
 

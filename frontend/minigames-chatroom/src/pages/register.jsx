@@ -1,27 +1,42 @@
-import {useState} from "react";
-import {useNavigate} from "react-router-dom";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import api from '../api.js';
 
-const Register = () =>{
+const Register = () => {
     const [username, setUsername] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
+    const rejex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const navigate = useNavigate();
 
-    function handleSubmit(e){
+    async function handleSubmit(e) {
         e.preventDefault();
+        setError("");
         // alert(`You entered: ${username}, ${email}, and ${password}`);
-        console.log(`You entered ${username}, ${email}, and ${password}.`);
-        api.post('/registration',{
-            username,
-            email,
-            password
-        }).then((response)=>{
-            console.log("Sent to backend: ", response.data)
+        // console.log(`You entered ${username}, ${email}, and ${password}.`);
+
+        if (!rejex.test(email)) {
+            setError("Please enter a valid email address.")
+            return;
+        }
+
+        if (password.length < 6) {
+            setError("Password must be greater than 6 characters.")
+            return;
+        }
+
+        try {
+            const response = await api.post('/registration', {
+                username,
+                email,
+                password
+            });
             navigate('/login');
-        }).catch((err)=>{
-            console.log("Error sending code to backend", err.response ? err.response.data : err.message)
-            alert(`Registration Failed! Error: ${err.response ? JSON.stringify(err.response.data) : err.message}`);
-        })
+        } catch (err) {
+            console.log("Error sending to backend:", err.response ? err.response.data : err.message);
+            setError(err.response?.data?.message);
+        }
     }
 
     return (
@@ -35,25 +50,27 @@ const Register = () =>{
                     <form onSubmit={handleSubmit} className={'flex flex-col gap-2 ml-6 mr-6'}>
                         <label>Username</label>
                         <input type={'text'} placeholder={'Enter username'} value={username} name={"username"}
-                               className={'pl-2 pt-1 pb-1 border border-solid border-gray-600 bg-black focus:outline-0 rounded-lg'}
-                               onChange={(e)=>setUsername(e.target.value)}/>
+                            className={'pl-2 pt-1 pb-1 border border-solid border-gray-600 bg-black focus:outline-0 rounded-lg'}
+                            onChange={(e) => setUsername(e.target.value)} />
                         <label>Email</label>
                         <input type={'email'} placeholder={'Enter email address'} value={email} name={"email"}
-                               className={'pl-2 pt-1 pb-1 border border-solid border-gray-600 bg-black  focus:outline-0 rounded-lg'}
-                               onChange={(e)=>setEmail(e.target.value)}/>
+                            className={'pl-2 pt-1 pb-1 border border-solid border-gray-600 bg-black  focus:outline-0 rounded-lg'}
+                            onChange={(e) => setEmail(e.target.value)} />
                         <label>Password</label>
                         <input type={'password'} placeholder={'Enter password'} value={password} name={"password"}
-                               className={'pl-2 pt-1 pb-1 border border-solid border-gray-600 bg-black  focus:outline-0 rounded-lg'}
-                               onChange={(e)=>setPassword(e.target.value)}/>
+                            className={'pl-2 pt-1 pb-1 border border-solid border-gray-600 bg-black  focus:outline-0 rounded-lg'}
+                            onChange={(e) => setPassword(e.target.value)} />
+                        {error && (
+                            <p className={'text-red-500 text-center'}>{error}</p>
+                        )}
                         <button type={'submit'} className={'bg-blue-500 rounded-full pb-1 pt-1'}>Register</button>
                     </form>
-                    <br/>
+                    <br />
                     <p className={'text-center'}>Already have an account? <a href={'/'} className={'text-blue-600'}>Sign in here</a></p>
-                    <br/>
+                    <br />
                 </div>
             </div>
         </div>
-
     )
 }
 

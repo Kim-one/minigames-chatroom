@@ -11,10 +11,17 @@ const SignIn = () =>{
     const characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890';
     const charactersLength = characters.length;
 
-    function handleGuestLogin(e){
+    async function handleGuestLogin(e){
         e.preventDefault()
-        generateRandomUsername(charactersLength)
-        
+        let guestUsername = generateRandomUsername(charactersLength)
+        try{
+            const response = await api.post('guest', {
+                guestUsername
+            })
+            console.log(response.data);
+        }catch (err){
+            console.log("Login Error: ", err)
+        }
         // navigate('/lobby');
     }
 

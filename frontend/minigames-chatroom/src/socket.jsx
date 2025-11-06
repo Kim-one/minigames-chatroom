@@ -1,19 +1,19 @@
-import {io} from "socket.io-client";
-const SOCKET_URL = 'http://localhost:5005'
+import { io } from "socket.io-client";
+const SOCKET_URL = 'http://localhost:5000'
 let socket = null;
 
-export const initializeSocket =(token)=>{
+export const initializeSocket = (token) => {
 
-    if(socket && socket.connected){
+    if (socket && socket.connected) {
         return socket
     }
 
-    if(!socket && token){
-        socket = io(SOCKET_URL,{
-            auth: {token}
+    if (!socket && token) {
+        socket = io(SOCKET_URL, {
+            auth: { token }
         });
 
-        socket.on('connect_error',(err)=>{
+        socket.on('connect_error', (err) => {
             console.error("Socket Auth Error ", err)
         })
     }
@@ -21,10 +21,10 @@ export const initializeSocket =(token)=>{
     return socket;
 }
 
-export const getSocket = ()=>socket;
+export const getSocket = () => socket;
 
-export const disconnectSocket = ()=>{
-    if(socket){
+export const disconnectSocket = () => {
+    if (socket) {
         socket.disconnect();
         socket = null
         console.log("Socket manually disconnected!")
