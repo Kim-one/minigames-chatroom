@@ -10,7 +10,7 @@ const MessagesModel = require('./models/Messages');
 const app = express();
 
 const { Server } = require("socket.io");
-const http = require('http');
+const http = require(`http`);
 const server = http.createServer(app)
 const { verifyToken } = require('./verifyToken');
 const validator = require('validator');

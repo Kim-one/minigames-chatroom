@@ -32,6 +32,7 @@ const Register = () => {
                 email,
                 password
             });
+            console.log(response.data)
             navigate('/login');
         } catch (err) {
             console.log("Error sending to backend:", err.response ? err.response.data : err.message);
