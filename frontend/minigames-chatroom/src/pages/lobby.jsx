@@ -50,6 +50,7 @@ const GameLobby = () => {
                     }
                 });
                 setChatrooms(response.data)
+                console.log(response)
                 // setLoading(false)
                 hasFetchedRooms.current = true
             } catch (err) {
@@ -86,18 +87,18 @@ const GameLobby = () => {
                     </ul>
                 </div>
                 {/*Main Section - Right Column*/}
-                <div className={'flex flex-1 flex-col p-4 space-y-4 border border-white'}>
+                <div className={'flex flex-1 flex-col p-4 space-y-4 border border-solid border-white'}>
                     {/*Top section*/}
-                    <div className={'flex p-4 border border-gray-400 justify-evenly content-center items-center'}>
-                        <div className={'-left-20 relative'}>
+                    <div className={'flex flex-row p-4 border border-solid border-blue-800 gap-3 content-center items-center justify-between'}>
+                        <div className={'relative'}>
                             <p className={'text-3xl font-bold dark:text-white'}>Chat Rooms</p>
                         </div>
-                        <div className={'flex flex-row relative'}>
+                        <div className={'flex flex-row relative w-full max-w-md'}>
                             <span className={'relative left-10 top-3'}><IoIosSearch className={'size-6'} /></span>
                             <input type={'text'} placeholder={'Search users or chat rooms...'}
-                                className={'bg-black border border-gray-400 rounded-full h-12 pl-12 pr-16'} />
+                                   className={'bg-black border border-gray-400 rounded-full h-12 pl-12 pr-4 w-full focus:outline-none'} />
                         </div>
-                        <div className={'relative'}>
+                        <div className={'relative ml-auto'}>
                             <button onClick={createChatRoom} className={'bg-blue-500 rounded-full pt-2 pb-2 pl-4 pr-4 flex place-self-end items-center content-evenly'}>
                                 <span><HiPlusSm className={'size-6'} /></span><p>Create New</p>
                             </button>

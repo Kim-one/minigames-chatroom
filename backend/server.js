@@ -209,11 +209,23 @@ app.post('/room/:roomID/join', verifyToken, async (req, res) => {
 })
 
 // Retrieves Chat rooms
-app.get('/rooms', async (req, res) => {
+app.get('/rooms',verifyToken, async (req, res) => {
+    const username = req.user?.username
+
+    if(!username){
+        return res.status(401).json({message:"User not authorised"})
+    }
+
     try {
-        const rooms = await ChatRoomModel.find({ isPrivate: false });
+
+        const rooms = await ChatRoomModel.find({
+            $or: [
+                {members: username},
+                {invitedUsers: username}]
+        });
 
         res.status(200).json(rooms)
+
     } catch {
         res.status(400).json({ message: "Error getting rooms" })
     }
