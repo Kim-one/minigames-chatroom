@@ -22,7 +22,7 @@ app.use(cors())
 dotenv.config()
 const io = new Server(server, {
     cors: {
-        origin: 'http://localhost:5173',
+        origin: process.env.URL,
         methods: ["POST", "GET"]
     }
 })
@@ -44,8 +44,6 @@ app.get('/users', async (req, res) => {
     }
 
 })
-
-
 
 app.post('/registration', async (req, res) => {
     const { username, email, password } = req.body;
