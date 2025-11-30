@@ -44,39 +44,40 @@ io.sockets.setMaxListeners(50);
 
 app.use(express.json())
 
-app.use((req, res, next) => {
-    if (req.method === 'OPTIONS') {
-        console.log('Preflight Request:');
-        console.log('URL:', req.url);
-        console.log('Headers:', req.headers);
-        console.log('Origin:', req.headers.origin);
+app.use(cors({
+    origin: process.env.CLIENT_URL,
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
 
-        res.header('Access-Control-Allow-Origin', process.env.CLIENT_URL);
-        res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-        res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-        res.header('Access-Control-Allow-Credentials', 'true');
-        res.status(200).send();
-    } else {
-        next();
-    }
-});
-
-// app.options('*', cors({
-//     origin: process.env.CLIENT_URL,
-//     credentials: true,
-//     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-//     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-// }));
-
-app.use((req, res, next) => {
-    if (req.method === 'OPTIONS') {
-        console.log('🛫 OPTIONS Preflight Request:');
-        console.log('  URL:', req.url);
-        console.log('  Headers:', req.headers);
-        console.log('  Origin:', req.headers.origin);
-    }
-    next();
-});
+// app.use((req, res, next) => {
+//     if (req.method === 'OPTIONS') {
+//         console.log('Preflight Request:');
+//         console.log('URL:', req.url);
+//         console.log('Headers:', req.headers);
+//         console.log('Origin:', req.headers.origin);
+//
+//         res.header('Access-Control-Allow-Origin', process.env.CLIENT_URL);
+//         res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+//         res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+//         res.header('Access-Control-Allow-Credentials', 'true');
+//         res.status(200).send();
+//     } else {
+//         next();
+//     }
+// });
+//
+//
+// app.use((req, res, next) => {
+//     if (req.method === 'OPTIONS') {
+//         console.log('🛫 OPTIONS Preflight Request:');
+//         console.log('  URL:', req.url);
+//         console.log('  Headers:', req.headers);
+//         console.log('  Origin:', req.headers.origin);
+//     }
+//     next();
+// });
 
 mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log("MongoDB connected"))
@@ -640,6 +641,12 @@ function startLobbyCountdown(lobbyId, roomId) {
                             players: lobby.players
                         });
 
+                        io.to(`lobby_${lobbyId}`).emit('game_starting',{
+                            lobbyId,
+                            gameType: lobby.gameType,
+                            players: lobby.players
+                        })
+
                         console.log(`Calling startGameSession`);
                         startGameSession(lobby);
                     } catch (saveErr) {
@@ -680,32 +687,32 @@ function startLobbyCountdown(lobbyId, roomId) {
     console.log(`Launching countdown for lobby ${lobbyId}`);
     checkLobby();
 }
-
-function handleCountdownEnd(lobby, roomId) {
-    console.log(`🎯 Handling countdown end for lobby ${lobby._id}`);
-
-    if (lobby.players.length >= lobby.minPlayers) {
-        console.log(`Starting game immediately`);
-        lobby.status = 'active';
-        lobby.save().then(() => {
-            io.to(roomId).emit('game_starting', {
-                lobbyId: lobby._id,
-                gameType: lobby.gameType,
-                players: lobby.players
-            });
-            startGameSession(lobby);
-        });
-    } else {
-        console.log(`Not enough players`);
-        lobby.status = 'finished';
-        lobby.save().then(() => {
-            io.to(roomId).emit('game_cancelled', {
-                lobbyId: lobby._id,
-                reason: `Not enough players. Need at least ${lobby.minPlayers} players.`
-            });
-        });
-    }
-}
+//
+// function handleCountdownEnd(lobby, roomId) {
+//     console.log(`🎯 Handling countdown end for lobby ${lobby._id}`);
+//
+//     if (lobby.players.length >= lobby.minPlayers) {
+//         console.log(`Starting game immediately`);
+//         lobby.status = 'active';
+//         lobby.save().then(() => {
+//             io.to(roomId).emit('game_starting', {
+//                 lobbyId: lobby._id,
+//                 gameType: lobby.gameType,
+//                 players: lobby.players
+//             });
+//             startGameSession(lobby);
+//         });
+//     } else {
+//         console.log(`Not enough players`);
+//         lobby.status = 'finished';
+//         lobby.save().then(() => {
+//             io.to(roomId).emit('game_cancelled', {
+//                 lobbyId: lobby._id,
+//                 reason: `Not enough players. Need at least ${lobby.minPlayers} players.`
+//             });
+//         });
+//     }
+// }
 
 function startGameSession(lobby) {
     console.log("Starting Game session for lobby: ", lobby._id.toString());

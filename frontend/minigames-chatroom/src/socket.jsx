@@ -30,13 +30,13 @@ export const initializeSocket = (token) => {
             auth: {
                 token: token
             },
-            transports: ['polling'],
+            transports: ['polling', 'websocket'],
             withCredentials: true,
             autoConnect: true,
             forceNew: true
         };
 
-        console.log('🔌 Socket options:', socketOptions);
+        console.log('Socket options:', socketOptions);
 
         socket = io(SOCKET_URL, socketOptions);
 
@@ -90,3 +90,6 @@ export const disconnectSocket = () => {
         console.log("Socket disconnected!");
     }
 }
+
+
+
