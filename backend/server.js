@@ -23,13 +23,15 @@ dotenv.config();
 app.use(cors({
     origin: process.env.CLIENT_URL,
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE"]
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
 const io = new Server(server, {
     cors: {
         origin: process.env.CLIENT_URL,
-        methods: ["POST", "GET"],
+        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
         credentials: true,
     },
     transports:['websocket', 'polling'],
@@ -37,9 +39,17 @@ const io = new Server(server, {
     pingInterval:25000,
     cookie:false
 })
+
 io.sockets.setMaxListeners(50);
 
 app.use(express.json())
+
+app.options('/room/:roomID/start-game', cors({
+    origin: process.env.CLIENT_URL,
+    credentials: true,
+    methods: ["POST", "OPTIONS"],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log("MongoDB connected"))
@@ -246,20 +256,30 @@ app.get('/room/:roomID/messages', verifyToken, async (req, res) => {
 
 app.post('/room/:roomID/start-game', verifyToken, async (req, res)=>{
     console.log('/room/:roomID/start-game route hit!');
+    console.log('Room ID:', req.params.roomID);
+    console.log('User making request:', req.user?.username);
+    console.log('Request body:', req.body);
+    console.log('Headers:', req.headers);
+
     const {roomID} = req.params;
     const {gameType} = req.body;
     const username = req.user?.username;
 
     try{
+        console.log('Trying to find room')
         const room = await ChatRoomModel.findById(roomID);
         if(!room){
             return res.status(404).json({message: "Room not found"});
         }
 
+        console.log('Searching for owner')
+
         if(room.owner !== username){
             return res.status(403).json({message: 'Only room owner can start games'});
         }
+        console.log('owner found');
 
+        console.log('checking for exiting lobbies')
         const existingLobby = await GameLobbyModel.findOne({
             roomId: roomID,
             status: {$in: ['waiting', 'starting', 'active']}
@@ -268,7 +288,9 @@ app.post('/room/:roomID/start-game', verifyToken, async (req, res)=>{
         if(existingLobby){
             return res.status(400).json({message: 'Game already in progress'});
         }
+        console.log('no lobbies found')
 
+        console.log('validating game type')
         const gameConfig = {
             SpaceShooter: {minPlayers: 2, maxPlayers: 4},
             Imposter: {minPlayers: 3, maxPlayers: 10}
