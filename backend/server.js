@@ -19,7 +19,10 @@ const GameLobbyModel = require('./models/GameLobbyModel');
 const CLIENT_URL = process.env.URL;
 
 
-app.use(cors())
+app.use(cors({
+    origin: CLIENT_URL,
+    methods: ['POST', 'GET']
+}))
 dotenv.config()
 const io = new Server(server, {
     cors: {
