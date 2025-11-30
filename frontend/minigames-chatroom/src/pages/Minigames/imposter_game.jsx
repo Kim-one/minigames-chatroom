@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 
 const ImposterGame = ({ socket, lobbyId, username, gameData, onGameEnd }) => {
     const [gameState, setGameState] = useState({
-        gameState: 'waiting',  // Default until updated
+        gameState: 'clue_submission',  // Default until updated
         currentRound: 1,
         maxRounds: 3,
         players: gameData?.players || [],  // From props
@@ -166,12 +166,12 @@ const ImposterGame = ({ socket, lobbyId, username, gameData, onGameEnd }) => {
 
     return (
         <div className="fixed inset-0 bg-gray-900 text-white flex">
-            <div style={{ position: 'absolute', top: 0, right: 0, background: 'red', color: 'white', padding: '10px', zIndex: 1000 }}>
-                Debug: Role: {playerInfo.yourRole || 'unknown'},
-                Theme: {playerInfo.theme || 'none'},
-                Word: {playerInfo.secretWord ? '✓' : '✗'},
-                Msg: {playerInfo.message ? '✓' : '✗'}
-            </div>
+            {/*<div style={{ position: 'absolute', top: 0, right: 0, background: 'red', color: 'white', padding: '10px', zIndex: 1000 }}>*/}
+            {/*    Debug: Role: {playerInfo.yourRole || 'unknown'},*/}
+            {/*    Theme: {playerInfo.theme || 'none'},*/}
+            {/*    Word: {playerInfo.secretWord ? '✓' : '✗'},*/}
+            {/*    Msg: {playerInfo.message ? '✓' : '✗'}*/}
+            {/*</div>*/}
             {/* Sidebar */}
             <div className="w-1/4 bg-gray-800 p-4 flex flex-col">
                 <h2 className="text-xl font-bold mb-4">Imposter Game</h2>
@@ -315,7 +315,7 @@ const ImposterGame = ({ socket, lobbyId, username, gameData, onGameEnd }) => {
                         <input
                             type="text"
                             placeholder="Type your message..."
-                            onKeyPress={(e) => {
+                            onChange={(e) => {
                                 if (e.key === 'Enter') {
                                     sendChatMessage(e.target.value);
                                     e.target.value = '';

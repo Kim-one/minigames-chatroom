@@ -89,7 +89,7 @@ app.post('/login', async (req, res) => {
         const token = jwt.sign(
             { id: user._id, username: user.username },
             process.env.SECRET_KEY,
-            { expiresIn: '1h' }
+            { expiresIn: '1d' }
         );
         const userResponse = { id: user._id, username: user.username, email: user.password };
         return res.json({
@@ -977,7 +977,7 @@ function startDiscussionPhase(lobbyId) {
     if (!gameState) return;
 
     gameState.gameState = 'discussion';
-    gameState.roundTimer = 120; // 2 minutes for discussion
+    gameState.roundTimer = 60; // 1 minutes for discussion
 
     // Reveal all clues to everyone
     const revealedClues = gameState.players
@@ -1003,7 +1003,7 @@ function startVotingPhase(lobbyId) {
     if (!gameState) return;
 
     gameState.gameState = 'voting';
-    gameState.roundTimer = 60; // 1 minute for voting
+    gameState.roundTimer = 30; // 30 seconds for voting
     gameState.votes = {};
 
     const alivePlayers = gameState.players.filter(p => p.isAlive).map(p => p.username);

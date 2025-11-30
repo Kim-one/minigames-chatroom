@@ -99,20 +99,27 @@ const GameLobby = () => {
                                    className={'bg-black border border-gray-400 rounded-full h-12 pl-12 pr-4 w-full focus:outline-none'} />
                         </div>
                         <div className={'relative ml-auto'}>
-                            <button onClick={createChatRoom} className={'bg-blue-500 rounded-full pt-2 pb-2 pl-4 pr-4 flex place-self-end items-center content-evenly'}>
+                            <button onClick={createChatRoom} className={'bg-blue-500 rounded-full pt-2 pb-2 pl-4 pr-4 flex place-self-end items-center content-evenly hover:scale-105'}>
                                 <span><HiPlusSm className={'size-6'} /></span><p>Create New</p>
                             </button>
                         </div>
                     </div>
                     {/*Bottom section*/}
-                    <div className={'flex-1  border border-gray-400 p-4 rounded shadow'}>
+                    <div className={'flex-1 border border-gray-400 p-4 rounded shadow'}>
                         Main Content - Display Chat Rooms
                         {chatrooms.length > 0 ? (
-                            chatrooms.map((chats) => (
-                                <div key={chats._id} className={'w-12 text-center border-white border border-solid rounded-full'}>
-                                    <p onClick={() => openChat(chats._id)}>{chats.chatroomName}</p>
+                            <div className={'mt-10 grid grid-cols-3 gap-y-16 gap-x-3'}>
+                                {chatrooms.map((chats) => (
+                                <div key={chats._id}>
+                                    <div className={'text-center cursor-pointer border-white border border-solid rounded-full px-2 py-2 hover:scale-105'}>
+                                        <button onClick={() => openChat(chats._id)}>
+                                            {chats.chatroomName}
+                                        </button>
+                                    </div>
                                 </div>
-                            ))
+                                ))}
+                            </div>
+
                         ) : (
                             <p>No chats rooms created as yet!</p>
                         )}
