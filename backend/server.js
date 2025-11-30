@@ -528,6 +528,13 @@ function startLobbyCountdown(lobbyId, roomId) {
                 minPlayers: lobby.minPlayers
             });
 
+            io.to(`lobby_${lobbyId}`).emit('lobby_countdown', {
+                lobbyId,
+                timeLeft: Math.max(0, timeLeft),
+                playerCount: lobby.players.length,
+                minPlayers: lobby.minPlayers
+            });
+
             if (timeLeft <= 0) {
                 // Countdown ended, start game if enough players
                 if (lobby.players.length >= lobby.minPlayers) {
@@ -535,6 +542,12 @@ function startLobbyCountdown(lobbyId, roomId) {
                     await lobby.save();
 
                     io.to(roomId).emit('game_starting', {
+                        lobbyId,
+                        gameType: lobby.gameType,
+                        players: lobby.players
+                    });
+
+                    io.to(`lobby_${lobbyId}`).emit('game_starting', {
                         lobbyId,
                         gameType: lobby.gameType,
                         players: lobby.players
@@ -569,9 +582,19 @@ function startLobbyCountdown(lobbyId, roomId) {
 }
 
 function startGameSession(lobby) {
-    console.log("Starting Game session for lobby: ", lobby._id);
+    console.log("Starting Game session for lobby: ", lobby._id.toString());
 
-    io.to(lobby.roomId.toString()).emit('game_session_started', {
+    const chatRoom = lobby.roomId.toString();
+    const gameLobbyRoom = `lobby_${lobby_.id}`;
+
+
+    io.to(chatRoom).emit('game_session_started', {
+        lobbyId: lobby._id,
+        gameType: lobby.gameType,
+        players: lobby.players
+    });
+
+    io.to(gameLobbyRoom).emit('game_session_started', {
         lobbyId: lobby._id,
         gameType: lobby.gameType,
         players: lobby.players
@@ -690,11 +713,22 @@ function initializeSpaceShooterGame(lobby) {
 
     spaceShooterGames.set(lobby._id.toString(), gameState);
 
+    const chatRoom = lobby.roomId.toString();
+    const gameLobbyRoom = `lobby_${lobby_.id}`;
+
+
+
     // Start the game loop
     startSpaceShooterGameLoop(lobby._id.toString());
 
     // Notify all players that game is starting
-    io.to(`lobby_${lobby._id}`).emit('space_shooter_game_start', {
+    io.to(chatRoom).emit('space_shooter_game_start', {
+        lobbyId: lobby._id,
+        players: gameState.players,
+        gameState: 'starting'
+    });
+
+    io.to(gameLobbyRoom).emit('space_shooter_game_start', {
         lobbyId: lobby._id,
         players: gameState.players,
         gameState: 'starting'
