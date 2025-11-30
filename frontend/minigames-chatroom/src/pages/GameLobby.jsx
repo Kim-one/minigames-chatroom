@@ -7,13 +7,28 @@ const GameLobby = ({ lobbyId, gameType, isOwner, onLeave, username, socket }) =>
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
+    const getToken=()=>{
+        return localStorage.getItem('token');
+    }
+
     useEffect(() => {
         const fetchLobbyInfo = async () => {
             try {
                 console.log('Fetching lobby info for:', lobbyId);
-                const response = await api.get(`/lobby/${lobbyId}`, {
-                    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-                });
+                const token = getToken();
+                if(!token){
+                    setError('No authentication token found');
+                    setLoading(false);
+                    return;
+                }
+
+                const response = await api.get(`/lobby/${lobbyId}`);
+                // const response = await api.get(`/lobby/${lobbyId}`, {
+                //     headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+                // });
+
+
+
 
                 console.log('Lobby API Response:', response.data);
 
