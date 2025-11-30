@@ -44,12 +44,22 @@ io.sockets.setMaxListeners(50);
 
 app.use(express.json())
 
-app.options('/room/:roomID/start-game', cors({
+app.options('*', cors({
     origin: process.env.CLIENT_URL,
     credentials: true,
-    methods: ["POST", "OPTIONS"],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
+
+app.use((req, res, next) => {
+    if (req.method === 'OPTIONS') {
+        console.log('🛫 OPTIONS Preflight Request:');
+        console.log('  URL:', req.url);
+        console.log('  Headers:', req.headers);
+        console.log('  Origin:', req.headers.origin);
+    }
+    next();
+});
 
 mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log("MongoDB connected"))
@@ -254,6 +264,12 @@ app.get('/room/:roomID/messages', verifyToken, async (req, res) => {
 
 });
 
+// app.options('/room/:roomID/start-game', cors({
+//     origin: process.env.CLIENT_URL,
+//     credentials: true,
+//     methods: ["POST", "OPTIONS"],
+//     allowedHeaders: ['Content-Type', 'Authorization']
+// }));
 app.post('/room/:roomID/start-game', verifyToken, async (req, res)=>{
     console.log('/room/:roomID/start-game route hit!');
     console.log('Room ID:', req.params.roomID);
@@ -321,8 +337,8 @@ app.post('/room/:roomID/start-game', verifyToken, async (req, res)=>{
         const ownerSocketId = Array.from(io.sockets.sockets.values()).find(socket => socket.username === username)?.id;
 
         if(ownerSocketId){
-            await GameLobbyModel.findByIdAndUpdate(newLobby_.id,{
-                $set: {"player.0.socketId":ownerSocketId}
+            await GameLobbyModel.findByIdAndUpdate(newLobby._id,{
+                $set: {"players.0.socketId":ownerSocketId}
             });
             console.log(`Updated socket owner ID to ${ownerSocketId}`)
         }
@@ -618,8 +634,7 @@ function initializeSpaceShooterGame(lobby) {
 
     lobby.players.forEach(player =>{
         console.log(`Player: ${player}, socket ID:${player.socketId}`);
-        const roomSocket = io.sockets.adapter.room.get(`lobby_${lobby._id} `) || new Set();
-
+        const roomSocket = io.sockets.adapter.rooms.get(`lobby_${lobby._id}`) || new Set();
         console.log(`Socket in room lobby_${lobby._id}`, Array.from(roomSocket));
         if(!player.socketId){
             console.log(`Player ${player.username} has not socket ID!`);
