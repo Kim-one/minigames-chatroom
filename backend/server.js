@@ -44,12 +44,29 @@ io.sockets.setMaxListeners(50);
 
 app.use(express.json())
 
-app.options('*', cors({
-    origin: process.env.CLIENT_URL,
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-}));
+app.use((req, res, next) => {
+    if (req.method === 'OPTIONS') {
+        console.log('Preflight Request:');
+        console.log('URL:', req.url);
+        console.log('Headers:', req.headers);
+        console.log('Origin:', req.headers.origin);
+
+        res.header('Access-Control-Allow-Origin', process.env.CLIENT_URL);
+        res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+        res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+        res.header('Access-Control-Allow-Credentials', 'true');
+        res.status(200).send();
+    } else {
+        next();
+    }
+});
+
+// app.options('*', cors({
+//     origin: process.env.CLIENT_URL,
+//     credentials: true,
+//     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+//     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+// }));
 
 app.use((req, res, next) => {
     if (req.method === 'OPTIONS') {
@@ -777,8 +794,6 @@ function updateEnemies(gameState) {
 
         // Remove enemies that go off screen
         return enemy.y <= 600;
-
-
     });
 }
 
