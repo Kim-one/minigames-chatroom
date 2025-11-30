@@ -40,7 +40,23 @@ app.use(express.json())
 
 mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log("MongoDB connected"))
-    .catch((err) => console.log("Error Connecting to DB: ", err))
+    .catch((err) => console.log("Error Connecting to DB: ", err));
+
+
+app.use((req, res, next) => {
+    const originalJson = res.json;
+    res.json = function(data) {
+        if (data && data.message === "No token provided") {
+            console.log('No token provided error detected!');
+            console.log('Route:', req.method, req.url);
+            console.log('Headers:', req.headers);
+            console.log('Query:', req.query);
+            console.log('Body:', req.body);
+        }
+        originalJson.call(this, data);
+    };
+    next();
+});
 
 app.get('/users', async (req, res) => {
     try {
@@ -276,6 +292,15 @@ app.post('/room/:roomID/start-game', verifyToken, async (req, res)=>{
             countdownEnds,
             status: 'waiting'
         });
+
+        const ownerSocketId = Array.from(io.sockets.sockets.values()).find(socket => socket.username === username)?.id;
+
+        if(ownerSocketId){
+            await GameLobbyModel.findByIdAndUpdate(newLobby_.id,{
+                $set: {"player.0.socketId":ownerSocketId}
+            });
+            console.log(`Updated socket owner ID to ${ownerSocketId}`)
+        }
 
         activeLobbies.set(roomID, newLobby._id);
 
@@ -570,10 +595,10 @@ function initializeSpaceShooterGame(lobby) {
         console.log(`Player: ${player}, socket ID:${player.socketId}`);
         const roomSocket = io.sockets.adapter.room.get(`lobby_${lobby._id} `) || new Set();
 
-        console.log(`Socket in room lobby_${lobby._id}:`, Array.from(roomSocket));
+        console.log(`Socket in room lobby_${lobby._id}`, Array.from(roomSocket));
         if(!player.socketId){
             console.log(`Player ${player.username} has not socket ID!`);
-        }else if(!roomSocket.has(player.username)){
+        }else if(!roomSocket.has(player.socketId)){
             console.log(`Player ${player.username} is not in room`);
         }else{
             console.log(`Player ${player.username} properly connected!`)
@@ -1586,6 +1611,7 @@ io.on('connection', (socket) => {
         try {
             console.log(`User ${socket.username} joining game lobby ${lobbyId}`);
             const lobby = await GameLobbyModel.findById(lobbyId);
+
             if (lobby) {
                 // Update player's socket ID in lobby
                 const player = lobby.players.find(p => p.username === socket.username);
