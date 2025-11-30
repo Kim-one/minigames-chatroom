@@ -1478,9 +1478,17 @@ function broadcastImposterGameState(lobbyId) {
 io.on('connection', (socket) => {
     console.log(`User Connected ${socket.id}, ${socket.username}`);
 
-    socket.on('join_room', (roomID) => {
+    socket.on('join_room', (roomID, callback) => {
         socket.join(roomID);
         console.log(`User ${socket.id} joined room ${roomID}`);
+        if(callback){
+            callback({status: 'ok', roomId: roomID});
+        }
+
+        socket.emit('join_room', {roomId: roomID});
+
+        console.log(`User ${socket.id} joined room ${roomID}`);
+        console.log(`Room ${roomID} now has:`, io.sockets.adapter.rooms.get(roomID)?.size || 0, 'sockets');
     });
 
     onlineUsers.set(socket.userId, {username: socket.username, socketId: socket.id})

@@ -1,5 +1,5 @@
 import { useParams } from "react-router-dom";
-import { useEffect, useState, useRef } from "react";
+import {useEffect, useState, useRef, act} from "react";
 import { useAuth } from "../AuthContext.jsx";
 import SpaceShooter from "./Minigames/space_shooter_game.jsx";
 import ImposterGame from "./Minigames/imposter_game.jsx";
@@ -53,11 +53,20 @@ const ChatRoom = () => {
         if (!activeSocket) return;
 
         const checkConnection = () => {
+            const rooms = Array.from(activeSocket.rooms || []);
             console.log('Socket Status Check:', {
                 connected: activeSocket.connected,
                 id: activeSocket.id,
-                rooms: Array.from(activeSocket.rooms || [])
+                rooms: rooms,
+                roomCount: rooms.length,
+                inChatRoom: rooms.includes(roomID),
+                inLobby: rooms.some(room => room.startsWith('lobby_'))
             });
+
+            if(!rooms.includes(roomID)){
+                console.log('Not in chat room, attempting to rejoin');
+                activeSocket.emit('join_room', roomID);
+            }
         };
 
         checkConnection();
@@ -100,7 +109,21 @@ const ChatRoom = () => {
                     })
                 })));
 
-                activeSocket.emit('join_room', roomID)
+                // activeSocket.emit('join_room', roomID)
+                console.log(`Joining chat room: ${roomID}`);
+                activeSocket.emit('join_room', roomID, (response) => {
+                    if (response && response.status === 'ok') {
+                        console.log(`Successfully joined room: ${roomID}`);
+                    } else {
+                        console.log('⚠Room join response:', response);
+                    }
+                });
+
+                // Also add a listener for room join confirmation
+                activeSocket.on('joined_room', (data) => {
+                    console.log(`Socket confirmed in room: ${data.roomId}`);
+                    console.log('Current rooms:', Array.from(activeSocket.rooms || []));
+                });
 
                 activeSocket.on('receive_message', (data) => {
                     console.log(`Received message ${data.content} from ${data.sender}`);
@@ -394,6 +417,30 @@ const ChatRoom = () => {
         activeSocket.emit('send_message', messageData);
         setMessage('')
     };
+
+    const rejoinRooms=()=>{
+        if(!activeSocket) return;
+
+        console.log('Force rejoining rooms...');
+
+        const currentRooms = Array.from(activeSocket.rooms || []);
+        currentRooms.forEach(room=>{
+            if(room !== activeSocket.id){
+                activeSocket.leave(room);
+                console.log(`Left room: ${room}`);
+            }
+        });
+
+        setTimeout(()=>{
+            console.log(`Rejoining game lobby: ${activeLobby.id}`);
+            activeSocket.emit('join_room', roomID);
+
+            if(activeLobby){
+                console.log(`Rejoining game lobby: ${activeLobby.id}`);
+                activeSocket.emit('join_game_lobby', activeLobby.id);
+            }
+        }, 100);
+    }
 
     const startGame = async (gameType) => {
         try {
