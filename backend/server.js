@@ -486,15 +486,15 @@ function startLobbyCountdown(lobbyId, roomId) {
 }
 
 function startGameSession(lobby) {
-    // Here you would initialize the specific game
-    // For now, we'll just broadcast that the game started
+    console.log("Starting Game session for lobby: ", lobby._id);
+
     io.to(lobby.roomId.toString()).emit('game_session_started', {
         lobbyId: lobby._id,
         gameType: lobby.gameType,
         players: lobby.players
     });
 
-    // Game-specific initialization would go here
+    console.log('Initializing game:', lobby.gameType);
     if (lobby.gameType === 'SpaceShooter') {
         initializeSpaceShooterGame(lobby);
     } else if (lobby.gameType === 'Imposter') {
@@ -565,6 +565,21 @@ const spaceShooterGames = new Map();
 
 function initializeSpaceShooterGame(lobby) {
     console.log(`Initializing Space Shooter game for lobby ${lobby._id}`);
+
+    lobby.players.forEach(player =>{
+        console.log(`Player: ${player}, socket ID:${player.socketId}`);
+        const roomSocket = io.sockets.adapter.room.get(`lobby_${lobby._id} `) || new Set();
+
+        console.log(`Socket in room lobby_${lobby._id}:`, Array.from(roomSocket));
+        if(!player.socketId){
+            console.log(`Player ${player.username} has not socket ID!`);
+        }else if(!roomSocket.has(player.username)){
+            console.log(`Player ${player.username} is not in room`);
+        }else{
+            console.log(`Player ${player.username} properly connected!`)
+        }
+
+    })
 
     // Create game state with proper socket IDs
     const gameState = {
@@ -696,11 +711,9 @@ function updateEnemies(gameState) {
         enemy.y += enemy.speed;
 
         // Remove enemies that go off screen
-        if (enemy.y > 600) {
-            return false;
-        }
+        return enemy.y <= 600;
 
-        return true;
+
     });
 }
 
