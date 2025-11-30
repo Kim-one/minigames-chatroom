@@ -28,6 +28,28 @@ const ChatRoom = () => {
     const [isInLobby, setIsInLobby] = useState(false);
 
     useEffect(() => {
+        if (activeSocket) {
+            console.log('🔌 Socket connection status:', {
+                connected: activeSocket.connected,
+                id: activeSocket.id,
+                transport: activeSocket.io.engine?.transport?.name
+            });
+
+            activeSocket.on('connect', () => {
+                console.log('Socket connected in production');
+            });
+
+            activeSocket.on('disconnect', (reason) => {
+                console.log('Socket disconnected:', reason);
+            });
+
+            activeSocket.on('connect_error', (error) => {
+                console.error('Socket connection error:', error);
+            });
+        }
+    }, [activeSocket]);
+
+    useEffect(() => {
         if (hasLoadedRef.current) {
             return
         }
@@ -228,6 +250,7 @@ const ChatRoom = () => {
             }
         };
     }, [roomID, activeSocket, token, isInLobby]);
+
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })

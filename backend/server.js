@@ -681,6 +681,32 @@ function startLobbyCountdown(lobbyId, roomId) {
     checkLobby();
 }
 
+function handleCountdownEnd(lobby, roomId) {
+    console.log(`🎯 Handling countdown end for lobby ${lobby._id}`);
+
+    if (lobby.players.length >= lobby.minPlayers) {
+        console.log(`Starting game immediately`);
+        lobby.status = 'active';
+        lobby.save().then(() => {
+            io.to(roomId).emit('game_starting', {
+                lobbyId: lobby._id,
+                gameType: lobby.gameType,
+                players: lobby.players
+            });
+            startGameSession(lobby);
+        });
+    } else {
+        console.log(`Not enough players`);
+        lobby.status = 'finished';
+        lobby.save().then(() => {
+            io.to(roomId).emit('game_cancelled', {
+                lobbyId: lobby._id,
+                reason: `Not enough players. Need at least ${lobby.minPlayers} players.`
+            });
+        });
+    }
+}
+
 function startGameSession(lobby) {
     console.log("Starting Game session for lobby: ", lobby._id.toString());
 

@@ -14,7 +14,7 @@ const GameLobby = ({ lobbyId, gameType, isOwner, onLeave, username, socket }) =>
     useEffect(() => {
         const fetchLobbyInfo = async () => {
             try {
-                console.log('Fetching lobby info for:', lobbyId);
+                // console.log('Fetching lobby info for:', lobbyId);
                 const token = getToken();
 
                 if(!token){
@@ -28,10 +28,7 @@ const GameLobby = ({ lobbyId, gameType, isOwner, onLeave, username, socket }) =>
                     headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
                 });
 
-
-
-
-                console.log('Lobby API Response:', response.data);
+                // console.log('Lobby API Response:', response.data);
 
                 if (response.data && typeof response.data === 'object') {
                     setLobbyInfo(response.data);
@@ -60,7 +57,6 @@ const GameLobby = ({ lobbyId, gameType, isOwner, onLeave, username, socket }) =>
         return () => clearInterval(interval);
     }, [lobbyId]);
 
-    // Real-time updates with socket (only if socket is available)
     useEffect(() => {
         if (!socket) {
             console.log('Socket not available for real-time updates');
@@ -190,15 +186,15 @@ const GameLobby = ({ lobbyId, gameType, isOwner, onLeave, username, socket }) =>
     const maxPlayers = lobbyInfo.maxPlayers || 0;
     const owner = lobbyInfo.owner || '';
 
-    console.log('Rendering lobby with data:', {
-        players,
-        playerCount,
-        minPlayers,
-        maxPlayers,
-        owner,
-        currentUser: username,
-        hasSocket: !!socket
-    });
+    // console.log('Rendering lobby with data:', {
+    //     players,
+    //     playerCount,
+    //     minPlayers,
+    //     maxPlayers,
+    //     owner,
+    //     currentUser: username,
+    //     hasSocket: !!socket
+    // });
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40">
