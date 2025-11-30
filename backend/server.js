@@ -16,17 +16,19 @@ const { verifyToken } = require('./verifyToken');
 const validator = require('validator');
 
 const GameLobbyModel = require('./models/GameLobbyModel');
-const CLIENT_URL = process.env.URL;
 
 
 app.use(cors({
-    origin: CLIENT_URL,
-    methods: ['POST', 'GET']
-}))
-dotenv.config()
+    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE"]
+}));
+
+dotenv.config();
+
 const io = new Server(server, {
     cors: {
-        origin: CLIENT_URL,
+        origin: process.env.CLIENT_URL,
         methods: ["POST", "GET"]
     }
 })
@@ -87,7 +89,7 @@ app.post('/login', async (req, res) => {
         const token = jwt.sign(
             { id: user._id, username: user.username },
             process.env.SECRET_KEY,
-            { expiresIn: '30d' }
+            { expiresIn: '1h' }
         );
         const userResponse = { id: user._id, username: user.username, email: user.password };
         return res.json({
