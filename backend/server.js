@@ -502,22 +502,63 @@ function startGameSession(lobby) {
     }
 }
 
+// io.use((socket, next) => {
+//     const token = socket.handshake.auth?.token;
+//     console.log(`Socket auth attempt: token=${token ? 'present' : 'missing'}`);
+//     if (!token) {
+//         console.log('Socket auth failed: No token provided');
+//         return next(new Error('Authentication error: No token'));
+//     }
+//     try {
+//         const decoded = jwt.verify(token, process.env.SECRET_KEY)
+//         socket.userId = decoded.id;
+//         socket.username = decoded.username
+//         next()
+//     } catch (err) {
+//         next(new Error('Invalid Token'));
+//     }
+// })
+
 io.use((socket, next) => {
-    const token = socket.handshake.auth?.token;
-    console.log(`Socket auth attempt: token=${token ? 'present' : 'missing'}`);
-    if (!token) {
-        console.log('Socket auth failed: No token provided');
-        return next(new Error('Authentication error: No token'));
+    console.log('=== SOCKET.IO AUTHENTICATION ===');
+    console.log('Socket ID:', socket.id);
+    console.log('Handshake headers:', socket.handshake.headers);
+    console.log('Handshake auth:', socket.handshake.auth);
+    console.log('Handshake query:', socket.handshake.query);
+
+    const tokenFromAuth = socket.handshake.auth?.token;
+    const tokenFromQuery = socket.handshake.query?.token;
+    const authHeader = socket.handshake.headers?.authorization;
+
+    console.log('Token from auth:', tokenFromAuth ? `Present (${tokenFromAuth.length} chars)` : 'Missing');
+    console.log('Token from query:', tokenFromQuery ? `Present (${tokenFromQuery.length} chars)` : 'Missing');
+    console.log('Auth header:', authHeader ? `Present (${authHeader.length} chars)` : 'Missing');
+
+    let token = tokenFromAuth || tokenFromQuery;
+
+    if (!token && authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.substring(7);
+        console.log('Extracted token from Authorization header');
     }
+
+    console.log('Final token to verify:', token ? `Present (${token.length} chars)` : 'MISSING');
+
+    if (!token) {
+        console.log('No token found in any location');
+        return next(new Error('No token provided'));
+    }
+
     try {
-        const decoded = jwt.verify(token, process.env.SECRET_KEY)
+        const decoded = jwt.verify(token, process.env.SECRET_KEY);
+        console.log('Successful for user:', decoded.username);
         socket.userId = decoded.id;
-        socket.username = decoded.username
-        next()
+        socket.username = decoded.username;
+        next();
     } catch (err) {
+        console.log('Token verification error:', err.message);
         next(new Error('Invalid Token'));
     }
-})
+});
 
 // Space Shooter socket event handlers
 const spaceShooterGames = new Map();
