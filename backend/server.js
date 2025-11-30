@@ -718,7 +718,7 @@ function startGameSession(lobby) {
     console.log("Starting Game session for lobby: ", lobby._id.toString());
 
     const chatRoom = lobby.roomId.toString();
-    const gameLobbyRoom = `lobby_${lobby_.id}`;
+    const gameLobbyRoom = `lobby_${lobby._id}`;
 
 
     io.to(chatRoom).emit('game_session_started', {
@@ -847,7 +847,7 @@ function initializeSpaceShooterGame(lobby) {
     spaceShooterGames.set(lobby._id.toString(), gameState);
 
     const chatRoom = lobby.roomId.toString();
-    const gameLobbyRoom = `lobby_${lobby_.id}`;
+    const gameLobbyRoom = `lobby_${lobby._id}`;
 
 
 
