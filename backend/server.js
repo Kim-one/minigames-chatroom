@@ -32,7 +32,10 @@ const io = new Server(server, {
         methods: ["POST", "GET"],
         credentials: true,
     },
-    transports:['websocket', 'polling']
+    transports:['websocket', 'polling'],
+    pingTimeout:60000,
+    pingInterval:25000,
+    cookie:false
 })
 io.sockets.setMaxListeners(50);
 
