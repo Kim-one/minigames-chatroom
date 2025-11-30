@@ -29,6 +29,16 @@ const ChatRoom = () => {
 
     useEffect(() => {
         if (activeSocket) {
+            console.log("FRONTEND SOCKET INFO:", {
+                id: activeSocket.id,
+                connected: activeSocket.connected,
+                hasListeners: true
+            });
+        }
+    }, [activeSocket]);
+
+    useEffect(() => {
+        if (activeSocket) {
             console.log('🔌 Socket connection status:', {
                 connected: activeSocket.connected,
                 id: activeSocket.id,

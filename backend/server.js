@@ -603,6 +603,17 @@ function startLobbyCountdown(lobbyId, roomId) {
                 return;
             }
 
+            lobby.players.forEach(player => {
+                if (player.socketId) {
+                    console.log(`TEST: Emitting directly to ${player.username} (${player.socketId})`);
+                    io.to(player.socketId).emit('game_starting_test', {
+                        lobbyId: lobby._id,
+                        gameType: lobby.gameType,
+                        message: 'DIRECT TO SOCKET'
+                    });
+                }
+            });
+
             const now = new Date();
             const timeLeft = lobby.countdownEnds - now;
 
@@ -635,6 +646,14 @@ function startLobbyCountdown(lobbyId, roomId) {
                         console.log(`Lobby status updated to 'active'`);
 
                         console.log(`Emitting game_starting to room ${roomId}`);
+                        console.log("DEBUG - About to emit game_starting:");
+                        console.log("Room ID:", roomId);
+                        console.log("Game Type:", lobby.gameType);
+                        console.log("Players:", lobby.players.length);
+
+                        const roomSockets = io.sockets.adapter.rooms.get(roomId);
+                        console.log("   Sockets in room:", roomSockets ? Array.from(roomSockets) : "ROOM NOT FOUND");
+                        console.log("   Current socket count in room:", roomSockets ? roomSockets.size : 0);
                         io.to(roomId).emit('game_starting', {
                             lobbyId,
                             gameType: lobby.gameType,
