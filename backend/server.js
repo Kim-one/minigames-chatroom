@@ -511,16 +511,105 @@ app.get('/lobby/:lobbyId', verifyToken, async (req, res) => {
 });
 
 // Countdown function
+// function startLobbyCountdown(lobbyId, roomId) {
+//     const checkLobby = async () => {
+//         try {
+//             const lobby = await GameLobbyModel.findById(lobbyId);
+//             if (!lobby) return;
+//
+//             const now = new Date();
+//             const timeLeft = lobby.countdownEnds - now;
+//
+//             // Broadcast countdown update every second
+//             io.to(roomId).emit('lobby_countdown', {
+//                 lobbyId,
+//                 timeLeft: Math.max(0, timeLeft),
+//                 playerCount: lobby.players.length,
+//                 minPlayers: lobby.minPlayers
+//             });
+//
+//             io.to(`lobby_${lobbyId}`).emit('lobby_countdown', {
+//                 lobbyId,
+//                 timeLeft: Math.max(0, timeLeft),
+//                 playerCount: lobby.players.length,
+//                 minPlayers: lobby.minPlayers
+//             });
+//
+//             if (timeLeft <= 0) {
+//                 // Countdown ended, start game if enough players
+//                 if (lobby.players.length >= lobby.minPlayers) {
+//                     lobby.status = 'active';
+//                     await lobby.save();
+//
+//                     io.to(roomId).emit('game_starting', {
+//                         lobbyId,
+//                         gameType: lobby.gameType,
+//                         players: lobby.players
+//                     });
+//
+//                     io.to(`lobby_${lobbyId}`).emit('game_starting', {
+//                         lobbyId,
+//                         gameType: lobby.gameType,
+//                         players: lobby.players
+//                     });
+//
+//                     // Start the actual game
+//                     startGameSession(lobby);
+//                 } else {
+//                     // Not enough players, cancel game
+//                     lobby.status = 'finished';
+//                     await lobby.save();
+//
+//                     io.to(roomId).emit('game_cancelled', {
+//                         lobbyId,
+//                         reason: `Not enough players. Need at least ${lobby.minPlayers} players.`
+//                     });
+//
+//                     activeLobbies.delete(roomId);
+//                 }
+//                 return;
+//             }
+//
+//             // Continue countdown
+//             setTimeout(() => checkLobby(), 1000);
+//         } catch (err) {
+//             console.error("Error in lobby countdown:", err);
+//         }
+//     };
+//
+//     // Start countdown
+//     setTimeout(() => checkLobby(), 1000);
+// }
+
 function startLobbyCountdown(lobbyId, roomId) {
+    console.log(`Staring countdown for lobby ${lobbyId}, room ${roomId}`);
+
+    let countdownActive = true;
+
     const checkLobby = async () => {
+        if (!countdownActive) {
+            console.log(`Countdown stopped for lobby ${lobbyId}`);
+            return;
+        }
+
         try {
+            console.log(`Checking lobby ${lobbyId} countdown...`);
             const lobby = await GameLobbyModel.findById(lobbyId);
-            if (!lobby) return;
+
+            if (!lobby) {
+                console.log(`Lobby ${lobbyId} not found - stopping countdown`);
+                countdownActive = false;
+                return;
+            }
 
             const now = new Date();
             const timeLeft = lobby.countdownEnds - now;
 
-            // Broadcast countdown update every second
+            console.log(`Lobby ${lobbyId}: ${Math.ceil(timeLeft / 1000)}s left (${timeLeft}ms)`);
+            console.log(`Countdown ends at: ${lobby.countdownEnds.toISOString()}`);
+            console.log(`Current time: ${now.toISOString()}`);
+
+            // Broadcast countdown update
             io.to(roomId).emit('lobby_countdown', {
                 lobbyId,
                 timeLeft: Math.max(0, timeLeft),
@@ -528,57 +617,68 @@ function startLobbyCountdown(lobbyId, roomId) {
                 minPlayers: lobby.minPlayers
             });
 
-            io.to(`lobby_${lobbyId}`).emit('lobby_countdown', {
-                lobbyId,
-                timeLeft: Math.max(0, timeLeft),
-                playerCount: lobby.players.length,
-                minPlayers: lobby.minPlayers
-            });
-
             if (timeLeft <= 0) {
+                console.log(`COUNTDOWN ENDED for lobby ${lobbyId}`);
+                console.log(`Players: ${lobby.players.length}, Required: ${lobby.minPlayers}`);
+
+                countdownActive = false; // Stop the countdown
+
                 // Countdown ended, start game if enough players
                 if (lobby.players.length >= lobby.minPlayers) {
-                    lobby.status = 'active';
-                    await lobby.save();
+                    console.log(`Starting game - enough players`);
 
-                    io.to(roomId).emit('game_starting', {
-                        lobbyId,
-                        gameType: lobby.gameType,
-                        players: lobby.players
-                    });
+                    try {
+                        // Update lobby status
+                        lobby.status = 'active';
+                        await lobby.save();
+                        console.log(`Lobby status updated to 'active'`);
 
-                    io.to(`lobby_${lobbyId}`).emit('game_starting', {
-                        lobbyId,
-                        gameType: lobby.gameType,
-                        players: lobby.players
-                    });
+                        console.log(`Emitting game_starting to room ${roomId}`);
+                        io.to(roomId).emit('game_starting', {
+                            lobbyId,
+                            gameType: lobby.gameType,
+                            players: lobby.players
+                        });
 
-                    // Start the actual game
-                    startGameSession(lobby);
+                        console.log(`Calling startGameSession`);
+                        startGameSession(lobby);
+                    } catch (saveErr) {
+                        console.error(`Error saving lobby:`, saveErr);
+                    }
                 } else {
                     // Not enough players, cancel game
-                    lobby.status = 'finished';
-                    await lobby.save();
+                    console.log(`Cancelling game - not enough players`);
+                    try {
+                        lobby.status = 'finished';
+                        await lobby.save();
 
-                    io.to(roomId).emit('game_cancelled', {
-                        lobbyId,
-                        reason: `Not enough players. Need at least ${lobby.minPlayers} players.`
-                    });
+                        io.to(roomId).emit('game_cancelled', {
+                            lobbyId,
+                            reason: `Not enough players. Need at least ${lobby.minPlayers} players.`
+                        });
 
-                    activeLobbies.delete(roomId);
+                        activeLobbies.delete(roomId);
+                    } catch (saveErr) {
+                        console.error(`Error cancelling game:`, saveErr);
+                    }
                 }
                 return;
             }
 
-            // Continue countdown
-            setTimeout(() => checkLobby(), 1000);
+            // Continue countdown if time still left
+            if (countdownActive) {
+                console.log(`Scheduling next countdown check for lobby ${lobbyId}`);
+                setTimeout(() => checkLobby(), 1000);
+            }
         } catch (err) {
             console.error("Error in lobby countdown:", err);
+            countdownActive = false;
         }
     };
 
-    // Start countdown
-    setTimeout(() => checkLobby(), 1000);
+    // Start the countdown
+    console.log(`Launching countdown for lobby ${lobbyId}`);
+    checkLobby();
 }
 
 function startGameSession(lobby) {
