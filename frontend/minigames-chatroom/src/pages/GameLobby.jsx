@@ -16,16 +16,17 @@ const GameLobby = ({ lobbyId, gameType, isOwner, onLeave, username, socket }) =>
             try {
                 console.log('Fetching lobby info for:', lobbyId);
                 const token = getToken();
+
                 if(!token){
                     setError('No authentication token found');
                     setLoading(false);
                     return;
                 }
 
-                const response = await api.get(`/lobby/${lobbyId}`);
-                // const response = await api.get(`/lobby/${lobbyId}`, {
-                //     headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-                // });
+                // const response = await api.get(`/lobby/${lobbyId}`);
+                const response = await api.get(`/lobby/${lobbyId}`, {
+                    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+                });
 
 
 
