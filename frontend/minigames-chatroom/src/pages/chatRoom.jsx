@@ -71,6 +71,36 @@ const ChatRoom = () => {
                 });
                 // setHasJoined(true);
 
+                activeSocket.on('game_session_started', (data) => {
+                    console.log('game_session_started event received:', data);
+                    console.log('Lobby ID:', data.lobbyId);
+                    console.log('Game Type:', data.gameType);
+
+                    console.log(`Joining game lobby: lobby_${data.lobbyId}`);
+                    activeSocket.emit('join_game_lobby', data.lobbyId);
+
+                    setActiveLobby({
+                        id: data.lobbyId,
+                        gameType: data.gameType,
+                        isOwner: false
+                    });
+
+                    setTimeout(() => {
+                        console.log(`Starting game: ${data.gameType}`);
+                        setSelectedGame(data.gameType);
+                    }, 500);
+                });
+
+                activeSocket.on('space_shooter_game_start', (data) => {
+                    console.log('space_shooter_game_start event received:', data);
+                    console.log('Game State:', data.gameState);
+                    console.log('Players:', data.players);
+
+                    if (data.gameState === 'starting' || data.gameState === 'active') {
+                        console.log('Space Shooter game is ready!');
+                    }
+                });
+
                 activeSocket.on('game_invitation', (data) => {
                     console.log('Game invitation received:', data);
                     setGameInvitation(data);
@@ -193,6 +223,8 @@ const ChatRoom = () => {
                 activeSocket.off('receive_message');
                 activeSocket.off('error');
                 activeSocket.off('join_active_game');
+                activeSocket.off('game_session_started');
+                activeSocket.off('space_shooter_game_start');
             }
         };
     }, [roomID, activeSocket, token, isInLobby]);
