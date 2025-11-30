@@ -18,13 +18,13 @@ const validator = require('validator');
 const GameLobbyModel = require('./models/GameLobbyModel');
 
 
+dotenv.config();
+
 app.use(cors({
     origin: process.env.CLIENT_URL,
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE"]
 }));
-
-dotenv.config();
 
 const io = new Server(server, {
     cors: {
