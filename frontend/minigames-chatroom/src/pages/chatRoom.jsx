@@ -50,6 +50,24 @@ const ChatRoom = () => {
     }, [activeSocket]);
 
     useEffect(() => {
+        if (!activeSocket) return;
+
+        const checkConnection = () => {
+            console.log('Socket Status Check:', {
+                connected: activeSocket.connected,
+                id: activeSocket.id,
+                rooms: Array.from(activeSocket.rooms || [])
+            });
+        };
+
+        checkConnection();
+
+        const interval = setInterval(checkConnection, 3000);
+
+        return () => clearInterval(interval);
+    }, [activeSocket]);
+
+    useEffect(() => {
         if (hasLoadedRef.current) {
             return
         }
@@ -167,16 +185,21 @@ const ChatRoom = () => {
                 });
 
                 activeSocket.on('game_starting', (data) => {
-                    console.log('Game starting received:', data);
+                    console.log('IMMEDIATE Game starting received:', data);
                     setGameInvitation(null);
                     setIsInLobby(false);
+
                     setActiveLobby({
                         id: data.lobbyId,
                         gameType: data.gameType,
                         isOwner: false
                     });
 
-                    // Add system message
+                    activeSocket.emit('join_game_lobby', data.lobbyId);
+
+                    console.log(`Starting game immediately: ${data.gameType}`);
+                    setSelectedGame(data.gameType);
+
                     const systemMessage = {
                         sender: 'System',
                         content: `Game starting! ${data.players.length} players joined.`,
@@ -184,24 +207,44 @@ const ChatRoom = () => {
                         isSystem: true
                     };
                     setMessages(prev => [...prev, systemMessage]);
-
-                    // Start the selected game after a brief delay to show the message
-                    setTimeout(() => {
-                        if (data.gameType === 'SpaceShooter') {
-                            setSelectedGame('SpaceShooter');
-                        } else if (data.gameType === 'Imposter') {
-                            setSelectedGame('Imposter');
-                        }
-                    }, 1000);
                 });
+
+                // activeSocket.on('game_starting', (data) => {
+                //     console.log('Game starting received:', data);
+                //     setGameInvitation(null);
+                //     setIsInLobby(false);
+                //     setActiveLobby({
+                //         id: data.lobbyId,
+                //         gameType: data.gameType,
+                //         isOwner: false
+                //     });
+                //
+                //     // Add system message
+                //     const systemMessage = {
+                //         sender: 'System',
+                //         content: `Game starting! ${data.players.length} players joined.`,
+                //         time: new Date().toLocaleTimeString(),
+                //         isSystem: true
+                //     };
+                //     setMessages(prev => [...prev, systemMessage]);
+                //
+                //     // Start the selected game after a brief delay to show the message
+                //     setTimeout(() => {
+                //         if (data.gameType === 'SpaceShooter') {
+                //             setSelectedGame('SpaceShooter');
+                //         } else if (data.gameType === 'Imposter') {
+                //             setSelectedGame('Imposter');
+                //         }
+                //     }, 1000);
+                // });
 
                 activeSocket.on('join_active_game', (data) => {
                     console.log('Joining active game:', data);
-                    setSelectedGame(data.gameType);  // e.g., 'Imposter'
+                    setSelectedGame(data.gameType);
                     setActiveLobby({
                         id: data.lobbyId,
                         gameType: data.gameType,
-                        isOwner: false  // Assume not owner for late joiners
+                        isOwner: false
                     });
                     setIsInLobby(true);
                 });
@@ -236,6 +279,7 @@ const ChatRoom = () => {
 
         return () => {
             if (activeSocket) {
+                console.log('Cleaning up all the socket listeners');
                 activeSocket.off('game_invitation');
                 activeSocket.off('player_joined_lobby');
                 activeSocket.off('player_left_lobby');
@@ -247,9 +291,80 @@ const ChatRoom = () => {
                 activeSocket.off('join_active_game');
                 activeSocket.off('game_session_started');
                 activeSocket.off('space_shooter_game_start');
+                activeSocket.offAny();
             }
         };
     }, [roomID, activeSocket, token, isInLobby]);
+
+    useEffect(() => {
+        if (!activeSocket) {
+            console.log('No active socket for game events');
+            return;
+        }
+
+        console.log('Setting up comprehensive game event listeners');
+
+        // Listen for ALL game-related events with detailed logging
+        const handleGameStarting = (data) => {
+            console.log('GAME_STARTING event received:', data);
+            setGameInvitation(null);
+            setIsInLobby(false);
+            setActiveLobby({
+                id: data.lobbyId,
+                gameType: data.gameType,
+                isOwner: false
+            });
+
+            // Immediately join the game lobby
+            console.log(`Joining game lobby: ${data.lobbyId}`);
+            activeSocket.emit('join_game_lobby', data.lobbyId);
+
+            // Start the game immediately
+            console.log(`Launching game: ${data.gameType}`);
+            setSelectedGame(data.gameType);
+        };
+
+        const handleGameSessionStarted = (data) => {
+            console.log('GAME_SESSION_STARTED event received:', data);
+            setGameInvitation(null);
+            setIsInLobby(false);
+            setActiveLobby({
+                id: data.lobbyId,
+                gameType: data.gameType,
+                isOwner: false
+            });
+
+            activeSocket.emit('join_game_lobby', data.lobbyId);
+            setSelectedGame(data.gameType);
+        };
+
+        const handleSpaceShooterGameStart = (data) => {
+            console.log('SPACE_SHOOTER_GAME_START event received:', data);
+            if (data.gameState === 'starting' || data.gameState === 'active') {
+                console.log('Space Shooter game is ready - starting now!');
+                setSelectedGame('SpaceShooter');
+            }
+        };
+
+        // Debug: Log ALL socket events to see what's coming through
+        activeSocket.onAny((eventName, ...args) => {
+            if (eventName.includes('game') || eventName.includes('lobby') || eventName.includes('start')) {
+                console.log(`Socket event [${eventName}]:`, args);
+            }
+        });
+
+        activeSocket.on('game_starting', handleGameStarting);
+        activeSocket.on('game_session_started', handleGameSessionStarted);
+        activeSocket.on('space_shooter_game_start', handleSpaceShooterGameStart);
+
+        return () => {
+            console.log('Cleaning up comprehensive game listeners');
+            activeSocket.off('game_starting', handleGameStarting);
+            activeSocket.off('game_session_started', handleGameSessionStarted);
+            activeSocket.off('space_shooter_game_start', handleSpaceShooterGameStart);
+            activeSocket.offAny();
+        };
+    }, [activeSocket]);
 
 
     useEffect(() => {
@@ -346,6 +461,16 @@ const ChatRoom = () => {
         } catch (err) {
             console.error("Error leaving lobby:", err);
         }
+    };
+
+    const manualStartGame = (gameType) => {
+        console.log('🔄 MANUAL game start triggered:', gameType);
+        setSelectedGame(gameType);
+        setActiveLobby({
+            id: 'manual-test',
+            gameType: gameType,
+            isOwner: true
+        });
     };
 
     return (
@@ -510,21 +635,6 @@ const ChatRoom = () => {
                         onGameEnd={() => setSelectedGame(null)}
                     />
                 )}
-
-                {/*{selectedGame === 'Imposter' && (*/}
-                {/*    <div className="flex-1 flex items-center justify-center">*/}
-                {/*        <div className="text-center">*/}
-                {/*            <h2 className="text-2xl font-bold mb-4">Imposter Game</h2>*/}
-                {/*            <p className="mb-4">Imposter game implementation would go here</p>*/}
-                {/*            <button*/}
-                {/*                onClick={() => setSelectedGame(null)}*/}
-                {/*                className="bg-red-500 px-4 py-2 rounded hover:bg-red-600"*/}
-                {/*            >*/}
-                {/*                Return to Chat*/}
-                {/*            </button>*/}
-                {/*        </div>*/}
-                {/*    </div>*/}
-                {/*)}*/}
             </div>
 
             {showAccessDenied && (
@@ -537,99 +647,26 @@ const ChatRoom = () => {
                     </div>
                 </div>
             )}
+            {/* TEMPORARY TEST BUTTON - REMOVE AFTER TESTING */}
+            {roomInfo?.owner === username && (
+                <div className="mt-4 p-2 border border-yellow-500 rounded">
+                    <p className="text-yellow-400 text-sm mb-2">Debug: Manual Start</p>
+                    <button
+                        onClick={() => manualStartGame('SpaceShooter')}
+                        className="bg-yellow-500 px-2 py-1 rounded text-sm mr-2"
+                    >
+                        Manual Space Shooter
+                    </button>
+                    <button
+                        onClick={() => manualStartGame('Imposter')}
+                        className="bg-yellow-500 px-2 py-1 rounded text-sm"
+                    >
+                        Manual Imposter
+                    </button>
+                </div>
+            )}
         </div>
 
-        // <div className={'w-full bg-black text-white h-[calc(100vh-3.5rem)] '}>
-        //     <div className={'flex flex-row flex-1 gap-3 relative'}>
-        //         {!selectedGame && (
-        //             <div className={'flex flex-row flex-1 gap-3 relative'}>
-        //                 {/*SIDEBAR*/}
-        //                 <div className={'border-r border-solid border-gray-600 w-1/4 h-[calc(100vh-3.5rem)]'}>
-        //                     <div>
-        //                         <p className={'pb-4 border-b border-solid border-gray-600'}>{username}</p>
-        //                     </div>
-        //                     <div>
-        //                         <p onClick={() => setShowChatInfo(false)}>#Chat</p>
-        //                     </div>
-        //                     {/*GAMES CONTAINER*/}
-        //                     <div>
-        //                         <p onClick={() => setShowGames(true)}>#Games</p>
-        //                         {showGames && (
-        //                             <div className={'flex flex-col gap-3'}>
-        //                                 <button className={'bg-blue-500'} onClick={() => setSelectedGame('SpaceShooter')}>Space Shooter Game</button>
-        //                                 <button onClick={() => setSelectedGame('Imposter')}>Imposter Game</button>
-        //                             </div>
-        //                         )}
-        //                     </div>
-        //                     {/*GENERAL INFO ABOUT CHATROOM*/}
-        //                     <div>
-        //                         <p onClick={() => setShowChatInfo(true)}>#General</p>
-        //                     </div>
-        //                 </div>
-        //                 {/*MAIN CHAT ROOM SECTION*/}
-        //                 {showChatInfo ? (
-        //                     <div className="flex flex-1 flex-col">
-        //                         <h1 className={'font-bold text-3xl'}>{roomInfo.chatroomName}</h1>
-        //                         <p>{roomInfo.description}</p>
-        //                         <h3 className="font-bold text-xl">Members</h3>
-        //                         <ul>
-        //                             {roomInfo.members.map((members, index) => (
-        //                                 <div key={index}>
-        //                                     <li>{members}</li>
-        //                                 </div>
-        //                             ))}
-        //                         </ul>
-        //                     </div>
-        //                 ) : (
-        //                     <div className={'flex flex-1 flex-col'}>
-        //                         <h2 className={'border-b border-solid border-gray-600 pb-4'}>Welcome to {roomInfo ? roomInfo.chatroomName : 'Loading...'}</h2>
-        //                         <div className={'flex flex-col gap-1 mb-3 mt-3 h-[calc(100vh-12.5rem)] overflow-y-auto scrollbar-hide'}>
-        //                             {messages.map((msg, index) => (
-        //                                 <div key={index} className={msg.sender === username ? 'my-message' : 'other-message'}>
-        //                                     {msg.sender === username ? (
-        //                                         <div className={'bg-blue-500 rounded pl-4 pr-4 pt-2 pb-2 w-64 float-right flex flex-col text-wrap'}>
-        //                                             <span className={'timestamp'}><strong>{msg.sender}:</strong> <p className={'float-right'}>{msg.time}</p></span>
-        //                                             {msg.content}
-        //                                         </div>
-        //
-        //                                     ) : (
-        //                                         <div className={'bg-green-400 rounded pl-4 pr-4 pt-2 pb-2 w-64 float-left flex flex-col'}>
-        //                                             <span className={'timestamp'}><strong>{msg.sender}</strong> <p className={'float-right'}>{msg.time}</p></span>
-        //                                             {msg.content}
-        //                                         </div>
-        //                                     )}
-        //                                 </div>
-        //                             ))}
-        //                             <div ref={messagesEndRef}></div>
-        //                         </div>
-        //                         <form onSubmit={sendMessage} className={'flex flex-row border-t border-solid border-gray-600'}>
-        //                             <input
-        //                                 className={'bg-gray-900 mt-2 w-full rounded-full focus:outline-none pl-2 pt-2 pb-2'}
-        //                                 type="text"
-        //                                 value={message}
-        //                                 onChange={(e) => setMessage(e.target.value)}
-        //                                 placeholder="Type your message..."
-        //                             />
-        //                             <button type="submit">Send</button>
-        //                         </form>
-        //                     </div>
-        //                 )}
-        //
-        //             </div>
-        //         )}
-        //         {selectedGame === 'SpaceShooter' && (<SpaceShooter socket={activeSocket} roomID={roomID} username={username} goBack={() => setSelectedGame(null)} />)}
-        //     </div>
-        //     {showAccessDenied && (
-        //         <div className={'inset-0 absolute '}>
-        //             <div className={'inset-0 absolute z-0 bg-black/90 w-full h-screen'}></div>
-        //             <div className={'w-full h-screen absolute z-50 flex flex-col items-center justify-center'}>
-        //                 <h2>Access Denied</h2>
-        //                 <p>You do not have permission to access this private chat</p>
-        //                 <button onClick={() => window.location.href = '/lobby'}>Go back</button>
-        //             </div>
-        //         </div>
-        //     )}
-        // </div>
     )
 }
 
