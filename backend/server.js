@@ -16,13 +16,14 @@ const { verifyToken } = require('./verifyToken');
 const validator = require('validator');
 
 const GameLobbyModel = require('./models/GameLobbyModel');
+const CLIENT_URL = process.env.URL;
 
 
 app.use(cors())
 dotenv.config()
 const io = new Server(server, {
     cors: {
-        origin: process.env.URL,
+        origin: CLIENT_URL,
         methods: ["POST", "GET"]
     }
 })
@@ -83,7 +84,7 @@ app.post('/login', async (req, res) => {
         const token = jwt.sign(
             { id: user._id, username: user.username },
             process.env.SECRET_KEY,
-            { expiresIn: '1h' }
+            { expiresIn: '1d' }
         );
         const userResponse = { id: user._id, username: user.username, email: user.password };
         return res.json({
@@ -294,52 +295,6 @@ app.post('/room/:roomID/start-game', verifyToken, async (req, res)=>{
     }
 });
 
-// app.post('/lobby/:lobbyId/join', verifyToken, async (req, res) => {
-//     const { lobbyId } = req.params;
-//     const username = req.user?.username;
-//
-//     try {
-//         const lobby = await GameLobbyModel.findById(lobbyId);
-//         if (!lobby) {
-//             return res.status(404).json({ message: "Lobby not found" });
-//         }
-//
-//         // Check if player already in lobby
-//         const alreadyJoined = lobby.players.some(player => player.username === username);
-//         if (alreadyJoined) {
-//             return res.status(400).json({ message: "Already joined lobby" });
-//         }
-//
-//         // Check if lobby is full
-//         if (lobby.players.length >= lobby.maxPlayers) {
-//             return res.status(400).json({ message: "Lobby is full" });
-//         }
-//
-//         // Check if game already started
-//         if (lobby.status !== 'waiting') {
-//             return res.status(400).json({ message: "Game already started" });
-//         }
-//
-//         // Add player to lobby
-//         lobby.players.push({ username, socketId: null });
-//         await lobby.save();
-//
-//         // Broadcast player joined
-//         io.to(lobby.roomId.toString()).emit('player_joined_lobby', {
-//             lobbyId,
-//             username,
-//             playerCount: lobby.players.length,
-//             minPlayers: lobby.minPlayers
-//         });
-//
-//         res.status(200).json({ message: "Joined lobby successfully" });
-//
-//     } catch (err) {
-//         console.error("Error joining lobby:", err);
-//         res.status(500).json({ message: "Error joining lobby" });
-//     }
-// });
-
 app.post('/lobby/:lobbyId/join', verifyToken, async (req, res) => {
     const { lobbyId } = req.params;
     const username = req.user?.username;
@@ -394,7 +349,7 @@ app.post('/lobby/:lobbyId/join', verifyToken, async (req, res) => {
         res.status(200).json({ message: "Joined lobby successfully" });
 
     } catch (err) {
-        console.error("❌ Error joining lobby:", err);
+        console.error("Error joining lobby:", err);
         res.status(500).json({
             message: "Error joining lobby",
             error: err.message
@@ -551,7 +506,6 @@ io.use((socket, next) => {
         const decoded = jwt.verify(token, process.env.SECRET_KEY)
         socket.userId = decoded.id;
         socket.username = decoded.username
-        // socket.user = decoded;
         next()
     } catch (err) {
         next(new Error('Invalid Token'));
@@ -1212,18 +1166,6 @@ function broadcastImposterGameState(lobbyId) {
     // CHANGED: Use new event name to avoid conflicts
     io.to(`lobby_${lobbyId}`).emit('imposter_game_state_word', publicGameState);
 }
-
-// function broadcastImposterGameState(lobbyId) {
-//     const gameState = imposterGames.get(lobbyId);
-//     if (!gameState || !gameState.isActive) return;
-//
-//     io.to(`lobby_${lobbyId}`).emit('imposter_game_state', {
-//         state: gameState.gameState,
-//         players: gameState.players
-//     });
-//
-//     setTimeout(() => broadcastImposterGameState(lobbyId), 1000);
-// }
 
 io.on('connection', (socket) => {
     console.log(`User Connected ${socket.id}, ${socket.username}`);
