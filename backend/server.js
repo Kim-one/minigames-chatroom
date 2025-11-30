@@ -29,8 +29,10 @@ app.use(cors({
 const io = new Server(server, {
     cors: {
         origin: process.env.CLIENT_URL,
-        methods: ["POST", "GET"]
-    }
+        methods: ["POST", "GET"],
+        credentials: true,
+    },
+    transports:['websocket', 'polling']
 })
 io.sockets.setMaxListeners(50);
 
