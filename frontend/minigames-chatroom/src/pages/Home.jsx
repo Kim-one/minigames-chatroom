@@ -1,5 +1,5 @@
 import {useState} from "react";
-import {API_URL} from '../api.js';
+import api from '../api.js';
 
 const Home = () => {
     const [url, setUrl] = useState(null);
@@ -46,7 +46,7 @@ const Home = () => {
 
     return (
         <div className={'bg-black text-white flex justify-center items-center h-[calc(100vh-3.5rem)]'}>
-            <button onClick={()=>setUrl(API_URL)}>Click me</button>
+            <button onClick={()=>setUrl(api)}>Click me</button>
             <p className={'text-white'}>{url}</p>
             {/*<div className={'justify-center items-center'}>*/}
                 {/*<button onClick={clearAllUserData}>Wipe Database (DEV ONLY)</button>*/}
