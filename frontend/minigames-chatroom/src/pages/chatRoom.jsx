@@ -248,6 +248,15 @@ const ChatRoom = () => {
                     setMessages(prev => [...prev, systemMessage]);
                 });
 
+                setTimeout(() => {
+                    console.log('Emitting client_ready event');
+                    activeSocket.emit('client_ready', {
+                        roomId: roomID,
+                        username: username,
+                        timestamp: Date.now()
+                    });
+                }, 1000);
+
             } catch (err) {
                 console.error("Error joining room:", err.response?.data || err.message);
                 if (err.response.status === 400) {

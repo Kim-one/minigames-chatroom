@@ -15,6 +15,7 @@ const http = require(`http`);
 const server = http.createServer(app)
 const { verifyToken } = require('./verifyToken');
 const validator = require('validator');
+const path = require('path');
 
 dotenv.config();
 
@@ -40,6 +41,8 @@ const io = new Server(server, {
 })
 
 io.sockets.setMaxListeners(50);
+
+const __dirname = path.resolve();
 
 app.use(express.json())
 
@@ -469,6 +472,78 @@ app.get('/lobby/:lobbyId', verifyToken, async (req, res) => {
     }
 });
 
+
+// DEBUGGING ROUTES
+// Debug endpoint to check lobby status
+app.get('/debug/lobby/:lobbyId', async (req, res) => {
+    try {
+        const lobby = await GameLobbyModel.findById(req.params.lobbyId);
+        if (!lobby) {
+            return res.status(404).json({ error: 'Lobby not found' });
+        }
+
+        const roomSockets = io.sockets.adapter.rooms.get(lobby.roomId.toString());
+        const lobbyRoomSockets = io.sockets.adapter.rooms.get(`lobby_${lobby._id}`);
+
+        res.json({
+            lobby: {
+                id: lobby._id,
+                status: lobby.status,
+                gameType: lobby.gameType,
+                players: lobby.players,
+                countdownEnds: lobby.countdownEnds,
+                startedAt: lobby.startedAt
+            },
+            sockets: {
+                inChatRoom: roomSockets ? Array.from(roomSockets) : [],
+                inLobbyRoom: lobbyRoomSockets ? Array.from(lobbyRoomSockets) : [],
+                totalConnected: io.engine.clientsCount
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Force game start endpoint for testing
+app.post('/debug/force-start/:lobbyId', async (req, res) => {
+    try {
+        const lobby = await GameLobbyModel.findById(req.params.lobbyId);
+        if (!lobby) {
+            return res.status(404).json({ error: 'Lobby not found' });
+        }
+
+        lobby.status = 'active';
+        lobby.startedAt = new Date();
+        await lobby.save();
+
+        // Emit game start events
+        io.to(lobby.roomId.toString()).emit('game_starting', {
+            lobbyId: lobby._id,
+            gameType: lobby.gameType,
+            players: lobby.players,
+            startedAt: lobby.startedAt,
+            forced: true
+        });
+
+        io.to(`lobby_${lobby._id}`).emit('game_starting', {
+            lobbyId: lobby._id,
+            gameType: lobby.gameType,
+            players: lobby.players,
+            startedAt: lobby.startedAt,
+            forced: true
+        });
+
+        res.json({
+            success: true,
+            message: 'Game force started',
+            lobbyId: lobby._id
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 function startLobbyCountdown(lobbyId, roomId) {
     console.log(`Staring countdown for lobby ${lobbyId}, room ${roomId}`);
 
@@ -544,28 +619,16 @@ function startLobbyCountdown(lobbyId, roomId) {
                         io.to(roomId).emit('game_starting', {
                             lobbyId,
                             gameType: lobby.gameType,
-                            players: lobby.players
+                            players: lobby.players,
+                            startedAt: new Date()
                         });
 
                         io.to(`lobby_${lobbyId}`).emit('game_starting',{
                             lobbyId,
                             gameType: lobby.gameType,
-                            players: lobby.players
+                            players: lobby.players,
+                            startedAt: new Date()
                         })
-
-                        io.to(roomId).emit('game_started', {
-                            lobbyId,
-                            gameType: lobby.gameType,
-                            players: lobby.players,
-                            startedAt: new Date()
-                        });
-
-                        io.to(`lobby_${lobbyId}`).emit('game_started', {
-                            lobbyId,
-                            gameType: lobby.gameType,
-                            players: lobby.players,
-                            startedAt: new Date()
-                        });
 
                         console.log(`Calling startGameSession`);
                         startGameSession(lobby);
@@ -1381,9 +1444,31 @@ function broadcastImposterGameState(lobbyId) {
 }
 
 const activeUserSockets = new Map();
+const socketReadyStates = new Map();
 
 io.on('connection', (socket) => {
     console.log(`User Connected ${socket.id}, ${socket.username}`);
+
+
+    socket.on('client_ready', (data) => {
+        console.log(`Client ${socket.username} is ready for game events`);
+        socketReadyStates.set(socket.id, true);
+
+        if (data.lobbyId) {
+            const lobby = activeLobbies.get(data.roomId);
+            if (lobby && lobby.status === 'active') {
+                setTimeout(() => {
+                    console.log(`Sending late game_starting to ${socket.username}`);
+                    socket.emit('game_starting', {
+                        lobbyId: lobby._id,
+                        gameType: lobby.gameType,
+                        players: lobby.players,
+                        startedAt: lobby.startedAt
+                    });
+                }, 1000);
+            }
+        }
+    });
 
     activeUserSockets.set(socket.userId, socket.id);
     console.log(`User ${socket.username} connected/reconnected with new socket ID: ${socket.id}`);
@@ -1931,6 +2016,32 @@ async function cleanupOldLobbies() {
 
 // Run cleanup every 10 minutes
 setInterval(cleanupOldLobbies, 60 * 10 * 1000);
+
+app.get('/health', (req, res) => {
+    res.json({
+        status: 'ok',
+        timestamp: new Date(),
+        environment: process.env.NODE_ENV || 'development',
+        socketConnections: io.engine.clientsCount,
+        memory: process.memoryUsage(),
+        uptime: process.uptime()
+    });
+});
+
+if (process.env.NODE_ENV === 'production') {
+    app.use(express.static(path.join(__dirname, '../frontend/minigames-chatroom/dist')));
+
+    console.log('Production mode: Serving static files from',
+        path.join(__dirname, '../frontend/minigames-chatroom/dist'));
+
+    app.get('*', (req, res) => {
+        if (req.path.startsWith('/api') || req.path.startsWith('/socket.io')) {
+            return res.status(404).send('Not found');
+        }
+
+        res.sendFile(path.join(__dirname, '../frontend/minigames-chatroom/dist/index.html'));
+    });
+}
 
 const PORT = process.env.PORT || 5000
 server.listen(PORT, () => {

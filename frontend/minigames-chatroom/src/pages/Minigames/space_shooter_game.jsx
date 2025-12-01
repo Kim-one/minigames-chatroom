@@ -120,60 +120,6 @@ const SpaceShooter = ({ socket, lobbyId, username, onGameEnd }) => {
         }
     };
 
-    // const handlePlayerInput = () => {
-    //     if (!gameState || !socket) return;
-    //
-    //     const player = gameState.players.find(p => p.username === username);
-    //     if (!player || !player.isAlive) return;
-    //
-    //     const speed = 5;
-    //     let newX = playerRef.current.x;
-    //     let newY = playerRef.current.y;
-    //     let moved = false;
-    //
-    //     // Movement keys
-    //     if (keys.current['ArrowLeft'] || keys.current['a'] || keys.current['A']) {
-    //         newX = Math.max(0, newX - speed);
-    //         moved = true;
-    //     }
-    //     if (keys.current['ArrowRight'] || keys.current['d'] || keys.current['D']) {
-    //         newX = Math.min(750, newX + speed);
-    //         moved = true;
-    //     }
-    //     if (keys.current['ArrowUp'] || keys.current['w'] || keys.current['W']) {
-    //         newY = Math.max(0, newY - speed);
-    //         moved = true;
-    //     }
-    //     if (keys.current['ArrowDown'] || keys.current['s'] || keys.current['S']) {
-    //         newY = Math.min(550, newY + speed);
-    //         moved = true;
-    //     }
-    //
-    //     if (moved) {
-    //         playerRef.current.x = newX;
-    //         playerRef.current.y = newY;
-    //
-    //
-    //         setGameState(prev => ({
-    //             ...prev,
-    //             players: prev.players.map(p => p.username === username
-    //                 ? { ...p, x: newX, y: newY } : p) }));
-    //
-    //         // Emit movement to server
-    //         socket.emit('space_shooter_player_move', {
-    //             lobbyId,
-    //             x: newX,
-    //             y: newY
-    //         });
-    //     }
-    //
-    //     // Shooting with spacebar
-    //     if (keys.current[' ']) {
-    //         socket.emit('space_shooter_player_shoot', { lobbyId });
-    //         keys.current[' '] = false;
-    //     }
-    // };
-
     // Game loop for smooth input
     const gameLoop = () => {
         // handlePlayerInput();
