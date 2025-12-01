@@ -15,7 +15,7 @@ const http = require(`http`);
 const server = http.createServer(app)
 const { verifyToken } = require('./verifyToken');
 const validator = require('validator');
-const path = require('path');
+// const path = require('path');
 
 dotenv.config();
 
@@ -42,7 +42,7 @@ const io = new Server(server, {
 
 io.sockets.setMaxListeners(50);
 
-const __dirname = path.resolve();
+// const __dirname = path.resolve();
 
 app.use(express.json())
 
@@ -2028,20 +2028,20 @@ app.get('/health', (req, res) => {
     });
 });
 
-if (process.env.NODE_ENV === 'production') {
-    app.use(express.static(path.join(__dirname, '../frontend/minigames-chatroom/dist')));
-
-    console.log('Production mode: Serving static files from',
-        path.join(__dirname, '../frontend/minigames-chatroom/dist'));
-
-    app.get("*", (req, res) => {
-        if (req.path.startsWith('/api') || req.path.startsWith('/socket.io')) {
-            return res.status(404).send('Not found');
-        }
-
-        res.sendFile(path.join(__dirname, '../frontend/minigames-chatroom/dist/index.html'));
-    });
-}
+// if (process.env.NODE_ENV === 'production') {
+//     app.use(express.static(path.join(__dirname, '../frontend/minigames-chatroom/dist')));
+//
+//     console.log('Production mode: Serving static files from',
+//         path.join(__dirname, '../frontend/minigames-chatroom/dist'));
+//
+//     app.get("*", (req, res) => {
+//         if (req.path.startsWith('/api') || req.path.startsWith('/socket.io')) {
+//             return res.status(404).send('Not found');
+//         }
+//
+//         res.sendFile(path.join(__dirname, '../frontend/minigames-chatroom/dist/index.html'));
+//     });
+// }
 
 const PORT = process.env.PORT || 5000
 server.listen(PORT, () => {
