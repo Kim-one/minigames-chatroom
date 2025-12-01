@@ -1,8 +1,6 @@
-import {useState} from "react";
-import api from '../api.js';
+
 
 const Home = () => {
-    const [url, setUrl] = useState(null);
 
     // async function clearAllUserData()  {
     //     try {
@@ -46,8 +44,6 @@ const Home = () => {
 
     return (
         <div className={'bg-black text-white flex justify-center items-center h-[calc(100vh-3.5rem)]'}>
-            <button onClick={()=>setUrl(api)}>Click me</button>
-            <p className={'text-white'}>{url}</p>
             {/*<div className={'justify-center items-center'}>*/}
                 {/*<button onClick={clearAllUserData}>Wipe Database (DEV ONLY)</button>*/}
                 {/*<button onClick={clearAllChatroomsData}>Wipe Database</button>*/}
