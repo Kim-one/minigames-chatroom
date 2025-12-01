@@ -553,6 +553,20 @@ function startLobbyCountdown(lobbyId, roomId) {
                             players: lobby.players
                         })
 
+                        io.to(roomId).emit('game_started', {
+                            lobbyId,
+                            gameType: lobby.gameType,
+                            players: lobby.players,
+                            startedAt: new Date()
+                        });
+
+                        io.to(`lobby_${lobbyId}`).emit('game_started', {
+                            lobbyId,
+                            gameType: lobby.gameType,
+                            players: lobby.players,
+                            startedAt: new Date()
+                        });
+
                         console.log(`Calling startGameSession`);
                         startGameSession(lobby);
                     } catch (saveErr) {
