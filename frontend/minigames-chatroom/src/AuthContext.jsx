@@ -21,13 +21,13 @@ export const AuthProvider =({children}) =>{
 
     useEffect(()=>{
         if(user && token){
-            const sockectInstance = initializeSocket(token)
-            setActiveSocket(sockectInstance);
+            const socketInstance = initializeSocket(token)
+            setActiveSocket(socketInstance);
 
             setTimeout(() => {
-                if(sockectInstance && !sockectInstance.connected){
+                if(socketInstance && !socketInstance.connected){
                     console.log("Socket not connected, attempting to reconnect");
-                    sockectInstance.connected();
+                    socketInstance.connect();
                 }
             }, 1000);
         }else{

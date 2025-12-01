@@ -87,247 +87,309 @@ const ChatRoom = () => {
     }, [activeSocket]);
 
     useEffect(() => {
-        if (hasLoadedRef.current) {
-            return
-        }
-        const joinRoom = async () => {
-            if (!activeSocket) {
-                return
-            }
-            try {
-                hasLoadedRef.current = true;
-                // Fetch room info
-                const roomRes = await api.get(`/room/${roomID}`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-                console.log("Room info fetched:", roomRes.data);
-                setRoomInfo(roomRes.data);
-                // Join the room
-                await api.post(`/room/${roomID}/join`, {}, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
+        if (!activeSocket) return;
 
-                const messagesRes = await api.get(`/room/${roomID}/messages`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
+        let isMounted = true;
 
-                setMessages(messagesRes.data.map(msg => ({
-                    ...msg,
-                    time: new Date(msg.createdAt).toLocaleTimeString([], {
-                        hour: '2-digit',
-                        minute: '2-digit'
-                    })
-                })));
+        const setupChatListeners = () => {
+            if (!isMounted) return;
 
-                // activeSocket.emit('join_room', roomID)
-                console.log(`Joining chat room: ${roomID}`);
-                activeSocket.emit('join_room', roomID, (response) => {
-                    if (response && response.status === 'ok') {
-                        console.log(`Successfully joined room: ${roomID}`);
-                    } else {
-                        console.log('⚠Room join response:', response);
-                    }
-                });
+            console.log("Setting up chat room socket listeners...");
 
-                // Also add a listener for room join confirmation
-                activeSocket.on('joined_room', (data) => {
-                    console.log(`Socket confirmed in room: ${data.roomId}`);
-                    console.log('Current rooms:', Array.from(activeSocket.rooms || []));
-                });
+            const joinRoomHandler = async () => {
+                try {
+                    // Fetch room info
+                    const roomRes = await api.get(`/room/${roomID}`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    console.log("Room info fetched:", roomRes.data);
+                    setRoomInfo(roomRes.data);
 
-                activeSocket.on('receive_message', (data) => {
-                    console.log(`Received message ${data.content} from ${data.sender}`);
-                    setMessages((list) => [...list, data]);
-                });
-                activeSocket.on('error', (msg) => {
-                    alert(msg);
-                });
-                // setHasJoined(true);
-
-                activeSocket.on('game_session_started', (data) => {
-                    console.log('game_session_started event received:', data);
-                    console.log('Lobby ID:', data.lobbyId);
-                    console.log('Game Type:', data.gameType);
-
-                    console.log(`Joining game lobby: lobby_${data.lobbyId}`);
-                    activeSocket.emit('join_game_lobby', data.lobbyId);
-
-                    setActiveLobby({
-                        id: data.lobbyId,
-                        gameType: data.gameType,
-                        isOwner: false
+                    // Join the room via backend
+                    await api.post(`/room/${roomID}/join`, {}, {
+                        headers: { Authorization: `Bearer ${token}` }
                     });
 
-                    setTimeout(() => {
-                        console.log(`Starting game: ${data.gameType}`);
-                        setSelectedGame(data.gameType);
-                    }, 500);
-                });
-
-                activeSocket.on('space_shooter_game_start', (data) => {
-                    console.log('space_shooter_game_start event received:', data);
-                    console.log('Game State:', data.gameState);
-                    console.log('Players:', data.players);
-
-                    if (data.gameState === 'starting' || data.gameState === 'active') {
-                        console.log('Space Shooter game is ready!');
-                    }
-                });
-
-                activeSocket.on('game_invitation', (data) => {
-                    console.log('Game invitation received:', data);
-                    setGameInvitation(data);
-
-                    // Add system message to chat
-                    const systemMessage = {
-                        sender: 'System',
-                        content: `${data.startedBy} started a ${data.gameType} game! You have 30 seconds to join.`,
-                        time: new Date().toLocaleTimeString(),
-                        isSystem: true
-                    };
-                    setMessages(prev => [...prev, systemMessage]);
-                });
-
-                activeSocket.on('player_joined_lobby', (data) => {
-                    // Add system message when player joins
-                    const systemMessage = {
-                        sender: 'System',
-                        content: `${data.username} joined the game lobby. (${data.playerCount}/${data.minPlayers} players)`,
-                        time: new Date().toLocaleTimeString(),
-                        isSystem: true
-                    };
-                    setMessages(prev => [...prev, systemMessage]);
-                });
-
-                activeSocket.on('player_left_lobby', (data) => {
-                    // Add system message when player leaves
-                    const systemMessage = {
-                        sender: 'System',
-                        content: `${data.username} left the game lobby. (${data.playerCount} players remaining)`,
-                        time: new Date().toLocaleTimeString(),
-                        isSystem: true
-                    };
-                    setMessages(prev => [...prev, systemMessage]);
-                });
-
-                activeSocket.on('lobby_countdown', (data) => {
-                    if (isInLobby) {
-                        // Update lobby countdown display
-                        setActiveLobby(prev => prev ? { ...prev, countdown: data.timeLeft } : null);
-                    }
-                });
-
-                activeSocket.on('game_starting', (data) => {
-                    console.log('IMMEDIATE Game starting received:', data);
-                    setGameInvitation(null);
-                    setIsInLobby(false);
-
-                    setActiveLobby({
-                        id: data.lobbyId,
-                        gameType: data.gameType,
-                        isOwner: false
+                    // Fetch existing messages
+                    const messagesRes = await api.get(`/room/${roomID}/messages`, {
+                        headers: { Authorization: `Bearer ${token}` }
                     });
 
-                    activeSocket.emit('join_game_lobby', data.lobbyId);
+                    setMessages(messagesRes.data.map(msg => ({
+                        ...msg,
+                        time: new Date(msg.createdAt).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        })
+                    })));
 
-                    console.log(`Starting game immediately: ${data.gameType}`);
-                    setSelectedGame(data.gameType);
-
-                    const systemMessage = {
-                        sender: 'System',
-                        content: `Game starting! ${data.players.length} players joined.`,
-                        time: new Date().toLocaleTimeString(),
-                        isSystem: true
-                    };
-                    setMessages(prev => [...prev, systemMessage]);
-                });
-
-                // activeSocket.on('game_starting', (data) => {
-                //     console.log('Game starting received:', data);
-                //     setGameInvitation(null);
-                //     setIsInLobby(false);
-                //     setActiveLobby({
-                //         id: data.lobbyId,
-                //         gameType: data.gameType,
-                //         isOwner: false
-                //     });
-                //
-                //     // Add system message
-                //     const systemMessage = {
-                //         sender: 'System',
-                //         content: `Game starting! ${data.players.length} players joined.`,
-                //         time: new Date().toLocaleTimeString(),
-                //         isSystem: true
-                //     };
-                //     setMessages(prev => [...prev, systemMessage]);
-                //
-                //     // Start the selected game after a brief delay to show the message
-                //     setTimeout(() => {
-                //         if (data.gameType === 'SpaceShooter') {
-                //             setSelectedGame('SpaceShooter');
-                //         } else if (data.gameType === 'Imposter') {
-                //             setSelectedGame('Imposter');
-                //         }
-                //     }, 1000);
-                // });
-
-                activeSocket.on('join_active_game', (data) => {
-                    console.log('Joining active game:', data);
-                    setSelectedGame(data.gameType);
-                    setActiveLobby({
-                        id: data.lobbyId,
-                        gameType: data.gameType,
-                        isOwner: false
+                    // Join via socket
+                    activeSocket.emit('join_room', roomID, (response) => {
+                        if (response?.status === 'ok') {
+                            console.log(`Successfully joined room: ${roomID}`);
+                        } else {
+                            console.warn('⚠ Room join response:', response);
+                        }
                     });
-                    setIsInLobby(true);
-                });
-
-
-                activeSocket.on('game_cancelled', (data) => {
-                    setGameInvitation(null);
-                    setIsInLobby(false);
-                    setActiveLobby(null);
-
-                    // Add system message
-                    const systemMessage = {
-                        sender: 'System',
-                        content: `Game cancelled: ${data.reason}`,
-                        time: new Date().toLocaleTimeString(),
-                        isSystem: true
-                    };
-                    setMessages(prev => [...prev, systemMessage]);
-                });
-
-            } catch (err) {
-                console.error("Error joining room:", err.response?.data || err.message);
-                if (err.response.status === 400) {
-                    setShowAccessDenied(true)
+                } catch (err) {
+                    console.error("Error joining room:", err.response?.data || err.message);
                 }
-                hasLoadedRef.current = false;
-            }
+            };
+
+            const onReceiveMessage = (data) => {
+                console.log(`Received message ${data.content} from ${data.sender}`);
+                setMessages(prev => [...prev, data]);
+            };
+
+            const onError = (msg) => {
+                alert(msg);
+            };
+
+            const onJoinedRoom = (data) => {
+                console.log(`Socket confirmed in room: ${data.roomId}`);
+                console.log('Current rooms:', Array.from(activeSocket.rooms || []));
+            };
+
+            // Register listeners
+            activeSocket.on('receive_message', onReceiveMessage);
+            activeSocket.on('error', onError);
+            activeSocket.on('joined_room', onJoinedRoom);
+
+            // Join the room after registering listeners
+            joinRoomHandler();
         };
-        if (activeSocket) {
-            joinRoom()
+
+        if (activeSocket.connected) {
+            setupChatListeners();
+        } else {
+            activeSocket.once('connect', setupChatListeners);
         }
 
+        // Cleanup listeners
         return () => {
-            if (activeSocket) {
-                console.log('Cleaning up all the socket listeners');
-                activeSocket.off('game_invitation');
-                activeSocket.off('player_joined_lobby');
-                activeSocket.off('player_left_lobby');
-                activeSocket.off('lobby_countdown');
-                activeSocket.off('game_starting');
-                activeSocket.off('game_cancelled');
-                activeSocket.off('receive_message');
-                activeSocket.off('error');
-                activeSocket.off('join_active_game');
-                activeSocket.off('game_session_started');
-                activeSocket.off('space_shooter_game_start');
-                activeSocket.offAny();
-            }
+            isMounted = false;
+            console.log('Cleaning up chat room socket listeners...');
+            activeSocket.off('receive_message');
+            activeSocket.off('error');
+            activeSocket.off('joined_room');
+            activeSocket.offAny();
         };
-    }, [roomID, activeSocket, token, isInLobby]);
+    }, [activeSocket, token, roomID]);
+
+
+    // useEffect(() => {
+    //     if (hasLoadedRef.current) {
+    //         return
+    //     }
+    //     const joinRoom = async () => {
+    //         if (!activeSocket) {
+    //             return
+    //         }
+    //         try {
+    //             hasLoadedRef.current = true;
+    //             // Fetch room info
+    //             const roomRes = await api.get(`/room/${roomID}`, {
+    //                 headers: { Authorization: `Bearer ${token}` }
+    //             });
+    //             console.log("Room info fetched:", roomRes.data);
+    //             setRoomInfo(roomRes.data);
+    //             // Join the room
+    //             await api.post(`/room/${roomID}/join`, {}, {
+    //                 headers: { Authorization: `Bearer ${token}` }
+    //             });
+    //
+    //             const messagesRes = await api.get(`/room/${roomID}/messages`, {
+    //                 headers: { Authorization: `Bearer ${token}` }
+    //             });
+    //
+    //             setMessages(messagesRes.data.map(msg => ({
+    //                 ...msg,
+    //                 time: new Date(msg.createdAt).toLocaleTimeString([], {
+    //                     hour: '2-digit',
+    //                     minute: '2-digit'
+    //                 })
+    //             })));
+    //
+    //             // activeSocket.emit('join_room', roomID)
+    //             console.log(`Joining chat room: ${roomID}`);
+    //             activeSocket.emit('join_room', roomID, (response) => {
+    //                 if (response && response.status === 'ok') {
+    //                     console.log(`Successfully joined room: ${roomID}`);
+    //                 } else {
+    //                     console.log('⚠Room join response:', response);
+    //                 }
+    //             });
+    //
+    //             // Also add a listener for room join confirmation
+    //             activeSocket.on('joined_room', (data) => {
+    //                 console.log(`Socket confirmed in room: ${data.roomId}`);
+    //                 console.log('Current rooms:', Array.from(activeSocket.rooms || []));
+    //             });
+    //
+    //             activeSocket.on('receive_message', (data) => {
+    //                 console.log(`Received message ${data.content} from ${data.sender}`);
+    //                 setMessages((list) => [...list, data]);
+    //             });
+    //             activeSocket.on('error', (msg) => {
+    //                 alert(msg);
+    //             });
+    //             // setHasJoined(true);
+    //
+    //             activeSocket.on('game_session_started', (data) => {
+    //                 console.log('game_session_started event received:', data);
+    //                 console.log('Lobby ID:', data.lobbyId);
+    //                 console.log('Game Type:', data.gameType);
+    //
+    //                 console.log(`Joining game lobby: lobby_${data.lobbyId}`);
+    //                 activeSocket.emit('join_game_lobby', data.lobbyId);
+    //
+    //                 setActiveLobby({
+    //                     id: data.lobbyId,
+    //                     gameType: data.gameType,
+    //                     isOwner: false
+    //                 });
+    //
+    //                 setTimeout(() => {
+    //                     console.log(`Starting game: ${data.gameType}`);
+    //                     setSelectedGame(data.gameType);
+    //                 }, 500);
+    //             });
+    //
+    //             activeSocket.on('space_shooter_game_start', (data) => {
+    //                 console.log('space_shooter_game_start event received:', data);
+    //                 console.log('Game State:', data.gameState);
+    //                 console.log('Players:', data.players);
+    //
+    //                 if (data.gameState === 'starting' || data.gameState === 'active') {
+    //                     console.log('Space Shooter game is ready!');
+    //                 }
+    //             });
+    //
+    //             activeSocket.on('game_invitation', (data) => {
+    //                 console.log('Game invitation received:', data);
+    //                 setGameInvitation(data);
+    //
+    //                 // Add system message to chat
+    //                 const systemMessage = {
+    //                     sender: 'System',
+    //                     content: `${data.startedBy} started a ${data.gameType} game! You have 30 seconds to join.`,
+    //                     time: new Date().toLocaleTimeString(),
+    //                     isSystem: true
+    //                 };
+    //                 setMessages(prev => [...prev, systemMessage]);
+    //             });
+    //
+    //             activeSocket.on('player_joined_lobby', (data) => {
+    //                 // Add system message when player joins
+    //                 const systemMessage = {
+    //                     sender: 'System',
+    //                     content: `${data.username} joined the game lobby. (${data.playerCount}/${data.minPlayers} players)`,
+    //                     time: new Date().toLocaleTimeString(),
+    //                     isSystem: true
+    //                 };
+    //                 setMessages(prev => [...prev, systemMessage]);
+    //             });
+    //
+    //             activeSocket.on('player_left_lobby', (data) => {
+    //                 // Add system message when player leaves
+    //                 const systemMessage = {
+    //                     sender: 'System',
+    //                     content: `${data.username} left the game lobby. (${data.playerCount} players remaining)`,
+    //                     time: new Date().toLocaleTimeString(),
+    //                     isSystem: true
+    //                 };
+    //                 setMessages(prev => [...prev, systemMessage]);
+    //             });
+    //
+    //             activeSocket.on('lobby_countdown', (data) => {
+    //                 if (isInLobby) {
+    //                     // Update lobby countdown display
+    //                     setActiveLobby(prev => prev ? { ...prev, countdown: data.timeLeft } : null);
+    //                 }
+    //             });
+    //
+    //             activeSocket.on('game_starting', (data) => {
+    //                 console.log('IMMEDIATE Game starting received:', data);
+    //                 setGameInvitation(null);
+    //                 setIsInLobby(false);
+    //
+    //                 setActiveLobby({
+    //                     id: data.lobbyId,
+    //                     gameType: data.gameType,
+    //                     isOwner: false
+    //                 });
+    //
+    //                 activeSocket.emit('join_game_lobby', data.lobbyId);
+    //
+    //                 console.log(`Starting game immediately: ${data.gameType}`);
+    //                 setSelectedGame(data.gameType);
+    //
+    //                 const systemMessage = {
+    //                     sender: 'System',
+    //                     content: `Game starting! ${data.players.length} players joined.`,
+    //                     time: new Date().toLocaleTimeString(),
+    //                     isSystem: true
+    //                 };
+    //                 setMessages(prev => [...prev, systemMessage]);
+    //             });
+    //
+    //             activeSocket.on('join_active_game', (data) => {
+    //                 console.log('Joining active game:', data);
+    //                 setSelectedGame(data.gameType);
+    //                 setActiveLobby({
+    //                     id: data.lobbyId,
+    //                     gameType: data.gameType,
+    //                     isOwner: false
+    //                 });
+    //                 setIsInLobby(true);
+    //             });
+    //
+    //
+    //             activeSocket.on('game_cancelled', (data) => {
+    //                 setGameInvitation(null);
+    //                 setIsInLobby(false);
+    //                 setActiveLobby(null);
+    //
+    //                 // Add system message
+    //                 const systemMessage = {
+    //                     sender: 'System',
+    //                     content: `Game cancelled: ${data.reason}`,
+    //                     time: new Date().toLocaleTimeString(),
+    //                     isSystem: true
+    //                 };
+    //                 setMessages(prev => [...prev, systemMessage]);
+    //             });
+    //
+    //         } catch (err) {
+    //             console.error("Error joining room:", err.response?.data || err.message);
+    //             if (err.response.status === 400) {
+    //                 setShowAccessDenied(true)
+    //             }
+    //             hasLoadedRef.current = false;
+    //         }
+    //     };
+    //     if (activeSocket) {
+    //         joinRoom()
+    //     }
+    //
+    //     return () => {
+    //         if (activeSocket) {
+    //             console.log('Cleaning up all the socket listeners');
+    //             activeSocket.off('game_invitation');
+    //             activeSocket.off('player_joined_lobby');
+    //             activeSocket.off('player_left_lobby');
+    //             activeSocket.off('lobby_countdown');
+    //             activeSocket.off('game_starting');
+    //             activeSocket.off('game_cancelled');
+    //             activeSocket.off('receive_message');
+    //             activeSocket.off('error');
+    //             activeSocket.off('join_active_game');
+    //             activeSocket.off('game_session_started');
+    //             activeSocket.off('space_shooter_game_start');
+    //             activeSocket.offAny();
+    //         }
+    //     };
+    // }, [roomID, activeSocket, token, isInLobby]);
 
     useEffect(() => {
         if (!activeSocket) {
