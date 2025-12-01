@@ -2034,7 +2034,7 @@ if (process.env.NODE_ENV === 'production') {
     console.log('Production mode: Serving static files from',
         path.join(__dirname, '../frontend/minigames-chatroom/dist'));
 
-    app.get('*', (req, res) => {
+    app.get("*", (req, res) => {
         if (req.path.startsWith('/api') || req.path.startsWith('/socket.io')) {
             return res.status(404).send('Not found');
         }
