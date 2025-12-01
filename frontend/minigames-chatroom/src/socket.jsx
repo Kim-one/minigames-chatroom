@@ -9,7 +9,7 @@ export const initializeSocket = (token) => {
         hasToken: !!token,
         tokenLength: token?.length,
         apiUrl: SOCKET_URL,
-        isLocalhost: window.location.hostname === 'localhost' || window.location.hostname === '74.220.48.0/24'
+        // isLocalhost: window.location.hostname === 'localhost' || window.location.hostname === '74.220.48.0/24'
     });
 
     if (socket && socket.connected) {
@@ -34,7 +34,7 @@ export const initializeSocket = (token) => {
             auth: {
                 token: token
             },
-            transports: [ 'websocket','polling'],
+            transports: [ 'websocket'],
             withCredentials: true,
             autoConnect: true,
             forceNew: true,
@@ -49,10 +49,10 @@ export const initializeSocket = (token) => {
 
         console.log('Socket options:', socketOptions);
 
-        const socketUrl = isDevelopment ? SOCKET_URL : window.location.origin;
+        const socketUrl = SOCKET_URL;
         console.log('Connection to: ', socketUrl);
 
-        socket = io(SOCKET_URL, socketOptions);
+        socket = io(socketUrl, socketOptions);
 
         socket.on('connect', () => {
             console.log('Socket connected successfully!');
