@@ -19,7 +19,7 @@ export const AuthProvider = ({ children }) => {
         if (!user || !token) return;
 
         if (!socketRef.current) {
-            const socket = io(process.env.REACT_APP_BACKEND_URL || "https://your-backend.onrender.com", {
+            const socket = io(import.meta.env.VITE_API_URL || "http://localhost:5000", {
                 auth: { token },
                 transports: ["websocket"],
                 reconnection: true,

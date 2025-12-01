@@ -7,6 +7,7 @@ const dotenv = require('dotenv');
 const UserModel = require('./models/Users');
 const ChatRoomModel = require('./models/chatroomModel');
 const MessagesModel = require('./models/Messages');
+const GameLobbyModel = require('./models/GameLobbyModel');
 const app = express();
 
 const { Server } = require("socket.io");
@@ -14,9 +15,6 @@ const http = require(`http`);
 const server = http.createServer(app)
 const { verifyToken } = require('./verifyToken');
 const validator = require('validator');
-
-const GameLobbyModel = require('./models/GameLobbyModel');
-
 
 dotenv.config();
 
@@ -44,41 +42,6 @@ const io = new Server(server, {
 io.sockets.setMaxListeners(50);
 
 app.use(express.json())
-
-app.use(cors({
-    origin: process.env.CLIENT_URL,
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-}));
-
-// app.use((req, res, next) => {
-//     if (req.method === 'OPTIONS') {
-//         console.log('Preflight Request:');
-//         console.log('URL:', req.url);
-//         console.log('Headers:', req.headers);
-//         console.log('Origin:', req.headers.origin);
-//
-//         res.header('Access-Control-Allow-Origin', process.env.CLIENT_URL);
-//         res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-//         res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-//         res.header('Access-Control-Allow-Credentials', 'true');
-//         res.status(200).send();
-//     } else {
-//         next();
-//     }
-// });
-//
-//
-// app.use((req, res, next) => {
-//     if (req.method === 'OPTIONS') {
-//         console.log('🛫 OPTIONS Preflight Request:');
-//         console.log('  URL:', req.url);
-//         console.log('  Headers:', req.headers);
-//         console.log('  Origin:', req.headers.origin);
-//     }
-//     next();
-// });
 
 mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log("MongoDB connected"))
@@ -283,12 +246,6 @@ app.get('/room/:roomID/messages', verifyToken, async (req, res) => {
 
 });
 
-// app.options('/room/:roomID/start-game', cors({
-//     origin: process.env.CLIENT_URL,
-//     credentials: true,
-//     methods: ["POST", "OPTIONS"],
-//     allowedHeaders: ['Content-Type', 'Authorization']
-// }));
 app.post('/room/:roomID/start-game', verifyToken, async (req, res)=>{
     console.log('/room/:roomID/start-game route hit!');
     console.log('Room ID:', req.params.roomID);
@@ -512,77 +469,6 @@ app.get('/lobby/:lobbyId', verifyToken, async (req, res) => {
     }
 });
 
-// Countdown function
-// function startLobbyCountdown(lobbyId, roomId) {
-//     const checkLobby = async () => {
-//         try {
-//             const lobby = await GameLobbyModel.findById(lobbyId);
-//             if (!lobby) return;
-//
-//             const now = new Date();
-//             const timeLeft = lobby.countdownEnds - now;
-//
-//             // Broadcast countdown update every second
-//             io.to(roomId).emit('lobby_countdown', {
-//                 lobbyId,
-//                 timeLeft: Math.max(0, timeLeft),
-//                 playerCount: lobby.players.length,
-//                 minPlayers: lobby.minPlayers
-//             });
-//
-//             io.to(`lobby_${lobbyId}`).emit('lobby_countdown', {
-//                 lobbyId,
-//                 timeLeft: Math.max(0, timeLeft),
-//                 playerCount: lobby.players.length,
-//                 minPlayers: lobby.minPlayers
-//             });
-//
-//             if (timeLeft <= 0) {
-//                 // Countdown ended, start game if enough players
-//                 if (lobby.players.length >= lobby.minPlayers) {
-//                     lobby.status = 'active';
-//                     await lobby.save();
-//
-//                     io.to(roomId).emit('game_starting', {
-//                         lobbyId,
-//                         gameType: lobby.gameType,
-//                         players: lobby.players
-//                     });
-//
-//                     io.to(`lobby_${lobbyId}`).emit('game_starting', {
-//                         lobbyId,
-//                         gameType: lobby.gameType,
-//                         players: lobby.players
-//                     });
-//
-//                     // Start the actual game
-//                     startGameSession(lobby);
-//                 } else {
-//                     // Not enough players, cancel game
-//                     lobby.status = 'finished';
-//                     await lobby.save();
-//
-//                     io.to(roomId).emit('game_cancelled', {
-//                         lobbyId,
-//                         reason: `Not enough players. Need at least ${lobby.minPlayers} players.`
-//                     });
-//
-//                     activeLobbies.delete(roomId);
-//                 }
-//                 return;
-//             }
-//
-//             // Continue countdown
-//             setTimeout(() => checkLobby(), 1000);
-//         } catch (err) {
-//             console.error("Error in lobby countdown:", err);
-//         }
-//     };
-//
-//     // Start countdown
-//     setTimeout(() => checkLobby(), 1000);
-// }
-
 function startLobbyCountdown(lobbyId, roomId) {
     console.log(`Staring countdown for lobby ${lobbyId}, room ${roomId}`);
 
@@ -707,32 +593,6 @@ function startLobbyCountdown(lobbyId, roomId) {
     console.log(`Launching countdown for lobby ${lobbyId}`);
     checkLobby();
 }
-//
-// function handleCountdownEnd(lobby, roomId) {
-//     console.log(`🎯 Handling countdown end for lobby ${lobby._id}`);
-//
-//     if (lobby.players.length >= lobby.minPlayers) {
-//         console.log(`Starting game immediately`);
-//         lobby.status = 'active';
-//         lobby.save().then(() => {
-//             io.to(roomId).emit('game_starting', {
-//                 lobbyId: lobby._id,
-//                 gameType: lobby.gameType,
-//                 players: lobby.players
-//             });
-//             startGameSession(lobby);
-//         });
-//     } else {
-//         console.log(`Not enough players`);
-//         lobby.status = 'finished';
-//         lobby.save().then(() => {
-//             io.to(roomId).emit('game_cancelled', {
-//                 lobbyId: lobby._id,
-//                 reason: `Not enough players. Need at least ${lobby.minPlayers} players.`
-//             });
-//         });
-//     }
-// }
 
 function startGameSession(lobby) {
     console.log("Starting Game session for lobby: ", lobby._id.toString());
@@ -841,19 +701,29 @@ function initializeSpaceShooterGame(lobby) {
 
     // Create game state with proper socket IDs
     const gameState = {
-        players: lobby.players.map((player, index) => ({
-            id: player.socketId,
-            username: player.username,
-            x: 400 + (index * 100),
-            y: 500,
-            width: 50,
-            height: 50,
-            health: 100,
-            score: 0,
-            color: getPlayerColor(index),
-            lastShot: 0,
-            isAlive: true
-        })),
+        players: lobby.players.map((player, index) => {
+            const currentSocketId = activeUserSockets.get(player.userId.toString());
+
+            if(!currentSocketId){
+                console.log(`Player ${player.username} is not currently connected`);
+                return null;
+            }
+
+            console.log(`Found current socket ID for ${player.username}: ${currentSocketId}`);
+            return {
+                id: player.socketId,
+                username: player.username,
+                x: 400 + (index * 100),
+                y: 500,
+                width: 50,
+                height: 50,
+                health: 100,
+                score: 0,
+                color: getPlayerColor(index),
+                lastShot: 0,
+                isAlive: true
+            };
+        }).filter(p=> p !== null),
         enemies: [],
         enemyBullets: [],
         playerBullets: [],
@@ -864,12 +734,14 @@ function initializeSpaceShooterGame(lobby) {
         gameLoop: null
     };
 
+    if(gameState.players.length === 0){
+        console.error(`Cannot start game. No active player found for lobby for lobby ${lobby._id}`);
+    }
+
     spaceShooterGames.set(lobby._id.toString(), gameState);
 
     const chatRoom = lobby.roomId.toString();
     const gameLobbyRoom = `lobby_${lobby._id}`;
-
-
 
     // Start the game loop
     startSpaceShooterGameLoop(lobby._id.toString());
@@ -1491,12 +1363,16 @@ function broadcastImposterGameState(lobbyId) {
         timeLeft: gameState.roundTimer
     };
 
-    // CHANGED: Use new event name to avoid conflicts
     io.to(`lobby_${lobbyId}`).emit('imposter_game_state_word', publicGameState);
 }
 
+const activeUserSockets = new Map();
+
 io.on('connection', (socket) => {
     console.log(`User Connected ${socket.id}, ${socket.username}`);
+
+    activeUserSockets.set(socket.userId, socket.id);
+    console.log(`User ${socket.username} connected/reconnected with new socket ID: ${socket.id}`);
 
     socket.on('join_room', (roomID, callback) => {
         socket.join(roomID);
