@@ -1,75 +1,88 @@
-import {createContext, useContext, useEffect, useState} from "react";
-import {initializeSocket, disconnectSocket} from "./socket.jsx";
+import { createContext, useContext, useEffect, useState, useRef } from "react";
+import { io } from "socket.io-client";
 
 const AuthContext = createContext(null);
 
-export const useAuth = ()=>{
-    return useContext(AuthContext);
-}
+export const useAuth = () => useContext(AuthContext);
 
-export const AuthProvider =({children}) =>{
-    const [user,setUser] = useState(null);
-    const [token, setToken] = useState(localStorage.getItem('token'))
+export const AuthProvider = ({ children }) => {
+    const [user, setUser] = useState(() => {
+        const saved = localStorage.getItem("user");
+        return saved ? JSON.parse(saved) : null;
+    });
+    const [token, setToken] = useState(() => localStorage.getItem("token"));
     const [activeSocket, setActiveSocket] = useState(null);
 
-    useEffect(()=>{
-        const savedUser = localStorage.getItem('user');
-        if(savedUser){
-            setUser(JSON.parse(savedUser))
-        }
-    },[]);
+    const socketRef = useRef(null);
 
-    useEffect(()=>{
-        if(user && token){
-            const socketInstance = initializeSocket(token)
-            setActiveSocket(socketInstance);
+    useEffect(() => {
+        if (!user || !token) return;
 
-            setTimeout(() => {
-                if(socketInstance && !socketInstance.connected){
-                    console.log("Socket not connected, attempting to reconnect");
-                    socketInstance.connect();
+        if (!socketRef.current) {
+            const socket = io(process.env.REACT_APP_BACKEND_URL || "https://your-backend.onrender.com", {
+                auth: { token },
+                transports: ["websocket"],
+                reconnection: true,
+                reconnectionAttempts: Infinity,
+                reconnectionDelay: 1000,
+                forceNew: true,
+            });
+
+            socketRef.current = socket;
+            setActiveSocket(socket);
+
+            socket.on("connect", () => {
+                console.log("Socket connected:", socket.id);
+            });
+
+            socket.on("disconnect", (reason) => {
+                console.log("Socket disconnected:", reason);
+            });
+
+            socket.on("connect_error", (err) => {
+                console.error("Socket connection error:", err.message);
+            });
+
+            socket.onAny((event, ...args) => {
+                if (event.includes("game") || event.includes("room") || event.includes("start")) {
+                    console.log(`Socket event [${event}]:`, args);
                 }
-            }, 1000);
-        }else{
-            if(activeSocket){
-                disconnectSocket()
-                setActiveSocket(null)
-            }
+            });
         }
 
         return () => {
-            if(activeSocket && !user){
-                console.log('Component unmount - disconnecting socket');
-                disconnectSocket();
+            if (socketRef.current) {
+                socketRef.current.disconnect();
+                socketRef.current = null;
+                setActiveSocket(null);
             }
-        }
-    },[user, token]);
+        };
+    }, [user, token]);
 
-    const handleSetUser = (userData)=>{
-        if(userData){
-            const newToken = localStorage.getItem('token')
-            console.log('Setting user: ', userData.username);
-            localStorage.setItem('user', JSON.stringify(userData))
+    // logout
+    const handleSetUser = (userData) => {
+        if (userData) {
+            localStorage.setItem("user", JSON.stringify(userData));
+            localStorage.setItem("token", localStorage.getItem("token") || "");
             setUser(userData);
-            setToken(newToken);
-        }else{
-            console.log('Clearing user');
-            localStorage.removeItem('user');
-            localStorage.removeItem('token');
+            setToken(localStorage.getItem("token"));
+        } else {
+            localStorage.removeItem("user");
+            localStorage.removeItem("token");
             setUser(null);
             setToken(null);
-        }
-    }
 
-    const value={
-        user,
-        setUser:handleSetUser,
-        activeSocket:activeSocket,
-        token
+            if (socketRef.current) {
+                socketRef.current.disconnect();
+                socketRef.current = null;
+                setActiveSocket(null);
+            }
+        }
     };
 
-    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+    return (
+        <AuthContext.Provider value={{ user, setUser: handleSetUser, activeSocket, token }}>
+            {children}
+        </AuthContext.Provider>
+    );
 };
-
-
-
