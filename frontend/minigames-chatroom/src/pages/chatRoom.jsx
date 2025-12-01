@@ -89,92 +89,201 @@ const ChatRoom = () => {
     useEffect(() => {
         if (!activeSocket) return;
 
-        let isMounted = true;
+        console.log("Setting up game/lobby socket listeners...");
 
-        const setupChatListeners = () => {
-            if (!isMounted) return;
+        // --- Event Handlers ---
+        const handleGameInvitation = (data) => {
+            console.log('Game invitation received:', data);
+            setGameInvitation(data);
 
-            console.log("Setting up chat room socket listeners...");
-
-            const joinRoomHandler = async () => {
-                try {
-                    // Fetch room info
-                    const roomRes = await api.get(`/room/${roomID}`, {
-                        headers: { Authorization: `Bearer ${token}` }
-                    });
-                    console.log("Room info fetched:", roomRes.data);
-                    setRoomInfo(roomRes.data);
-
-                    // Join the room via backend
-                    await api.post(`/room/${roomID}/join`, {}, {
-                        headers: { Authorization: `Bearer ${token}` }
-                    });
-
-                    // Fetch existing messages
-                    const messagesRes = await api.get(`/room/${roomID}/messages`, {
-                        headers: { Authorization: `Bearer ${token}` }
-                    });
-
-                    setMessages(messagesRes.data.map(msg => ({
-                        ...msg,
-                        time: new Date(msg.createdAt).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit'
-                        })
-                    })));
-
-                    // Join via socket
-                    activeSocket.emit('join_room', roomID, (response) => {
-                        if (response?.status === 'ok') {
-                            console.log(`Successfully joined room: ${roomID}`);
-                        } else {
-                            console.warn('⚠ Room join response:', response);
-                        }
-                    });
-                } catch (err) {
-                    console.error("Error joining room:", err.response?.data || err.message);
-                }
+            const systemMessage = {
+                sender: 'System',
+                content: `${data.startedBy} started a ${data.gameType} game! You have 30 seconds to join.`,
+                time: new Date().toLocaleTimeString(),
+                isSystem: true
             };
-
-            const onReceiveMessage = (data) => {
-                console.log(`Received message ${data.content} from ${data.sender}`);
-                setMessages(prev => [...prev, data]);
-            };
-
-            const onError = (msg) => {
-                alert(msg);
-            };
-
-            const onJoinedRoom = (data) => {
-                console.log(`Socket confirmed in room: ${data.roomId}`);
-                console.log('Current rooms:', Array.from(activeSocket.rooms || []));
-            };
-
-            // Register listeners
-            activeSocket.on('receive_message', onReceiveMessage);
-            activeSocket.on('error', onError);
-            activeSocket.on('joined_room', onJoinedRoom);
-
-            // Join the room after registering listeners
-            joinRoomHandler();
+            setMessages(prev => [...prev, systemMessage]);
         };
 
-        if (activeSocket.connected) {
-            setupChatListeners();
-        } else {
-            activeSocket.once('connect', setupChatListeners);
-        }
+        const handlePlayerJoinedLobby = (data) => {
+            const systemMessage = {
+                sender: 'System',
+                content: `${data.username} joined the game lobby. (${data.playerCount}/${data.minPlayers} players)`,
+                time: new Date().toLocaleTimeString(),
+                isSystem: true
+            };
+            setMessages(prev => [...prev, systemMessage]);
+        };
 
-        // Cleanup listeners
+        const handlePlayerLeftLobby = (data) => {
+            const systemMessage = {
+                sender: 'System',
+                content: `${data.username} left the game lobby. (${data.playerCount} players remaining)`,
+                time: new Date().toLocaleTimeString(),
+                isSystem: true
+            };
+            setMessages(prev => [...prev, systemMessage]);
+        };
+
+        const handleLobbyCountdown = (data) => {
+            if (isInLobby) {
+                setActiveLobby(prev => prev ? { ...prev, countdown: data.timeLeft } : null);
+            }
+        };
+
+        const handleGameStarting = (data) => {
+            console.log('Game starting event received:', data);
+            setGameInvitation(null);
+            setIsInLobby(false);
+
+            setActiveLobby({
+                id: data.lobbyId,
+                gameType: data.gameType,
+                isOwner: false
+            });
+
+            activeSocket.emit('join_game_lobby', data.lobbyId);
+            setSelectedGame(data.gameType);
+
+            const systemMessage = {
+                sender: 'System',
+                content: `Game starting! ${data.players.length} players joined.`,
+                time: new Date().toLocaleTimeString(),
+                isSystem: true
+            };
+            setMessages(prev => [...prev, systemMessage]);
+        };
+
+        const handleGameCancelled = (data) => {
+            setGameInvitation(null);
+            setIsInLobby(false);
+            setActiveLobby(null);
+
+            const systemMessage = {
+                sender: 'System',
+                content: `Game cancelled: ${data.reason}`,
+                time: new Date().toLocaleTimeString(),
+                isSystem: true
+            };
+            setMessages(prev => [...prev, systemMessage]);
+        };
+
+        // --- Register Listeners ---
+        activeSocket.on('game_invitation', handleGameInvitation);
+        activeSocket.on('player_joined_lobby', handlePlayerJoinedLobby);
+        activeSocket.on('player_left_lobby', handlePlayerLeftLobby);
+        activeSocket.on('lobby_countdown', handleLobbyCountdown);
+        activeSocket.on('game_starting', handleGameStarting);
+        activeSocket.on('game_cancelled', handleGameCancelled);
+
+        // --- Optional: handle other events like messages ---
+        activeSocket.on('receive_message', (data) => {
+            setMessages(prev => [...prev, data]);
+        });
+
+        // --- Cleanup on unmount ---
         return () => {
-            isMounted = false;
-            console.log('Cleaning up chat room socket listeners...');
+            console.log('Cleaning up game/lobby listeners...');
+            activeSocket.off('game_invitation', handleGameInvitation);
+            activeSocket.off('player_joined_lobby', handlePlayerJoinedLobby);
+            activeSocket.off('player_left_lobby', handlePlayerLeftLobby);
+            activeSocket.off('lobby_countdown', handleLobbyCountdown);
+            activeSocket.off('game_starting', handleGameStarting);
+            activeSocket.off('game_cancelled', handleGameCancelled);
             activeSocket.off('receive_message');
-            activeSocket.off('error');
-            activeSocket.off('joined_room');
-            activeSocket.offAny();
         };
-    }, [activeSocket, token, roomID]);
+    }, [activeSocket, isInLobby]);
+
+
+    // useEffect(() => {
+    //     if (!activeSocket) return;
+    //
+    //     let isMounted = true;
+    //
+    //     const setupChatListeners = () => {
+    //         if (!isMounted) return;
+    //
+    //         console.log("Setting up chat room socket listeners...");
+    //
+    //         const joinRoomHandler = async () => {
+    //             try {
+    //                 // Fetch room info
+    //                 const roomRes = await api.get(`/room/${roomID}`, {
+    //                     headers: { Authorization: `Bearer ${token}` }
+    //                 });
+    //                 console.log("Room info fetched:", roomRes.data);
+    //                 setRoomInfo(roomRes.data);
+    //
+    //                 // Join the room via backend
+    //                 await api.post(`/room/${roomID}/join`, {}, {
+    //                     headers: { Authorization: `Bearer ${token}` }
+    //                 });
+    //
+    //                 // Fetch existing messages
+    //                 const messagesRes = await api.get(`/room/${roomID}/messages`, {
+    //                     headers: { Authorization: `Bearer ${token}` }
+    //                 });
+    //
+    //                 setMessages(messagesRes.data.map(msg => ({
+    //                     ...msg,
+    //                     time: new Date(msg.createdAt).toLocaleTimeString([], {
+    //                         hour: '2-digit',
+    //                         minute: '2-digit'
+    //                     })
+    //                 })));
+    //
+    //                 // Join via socket
+    //                 activeSocket.emit('join_room', roomID, (response) => {
+    //                     if (response?.status === 'ok') {
+    //                         console.log(`Successfully joined room: ${roomID}`);
+    //                     } else {
+    //                         console.warn('⚠ Room join response:', response);
+    //                     }
+    //                 });
+    //             } catch (err) {
+    //                 console.error("Error joining room:", err.response?.data || err.message);
+    //             }
+    //         };
+    //
+    //         const onReceiveMessage = (data) => {
+    //             console.log(`Received message ${data.content} from ${data.sender}`);
+    //             setMessages(prev => [...prev, data]);
+    //         };
+    //
+    //         const onError = (msg) => {
+    //             alert(msg);
+    //         };
+    //
+    //         const onJoinedRoom = (data) => {
+    //             console.log(`Socket confirmed in room: ${data.roomId}`);
+    //             console.log('Current rooms:', Array.from(activeSocket.rooms || []));
+    //         };
+    //
+    //         // Register listeners
+    //         activeSocket.on('receive_message', onReceiveMessage);
+    //         activeSocket.on('error', onError);
+    //         activeSocket.on('joined_room', onJoinedRoom);
+    //
+    //         // Join the room after registering listeners
+    //         joinRoomHandler();
+    //     };
+    //
+    //     if (activeSocket.connected) {
+    //         setupChatListeners();
+    //     } else {
+    //         activeSocket.once('connect', setupChatListeners);
+    //     }
+    //
+    //     // Cleanup listeners
+    //     return () => {
+    //         isMounted = false;
+    //         console.log('Cleaning up chat room socket listeners...');
+    //         activeSocket.off('receive_message');
+    //         activeSocket.off('error');
+    //         activeSocket.off('joined_room');
+    //         activeSocket.offAny();
+    //     };
+    // }, [activeSocket, token, roomID]);
 
 
     // useEffect(() => {
