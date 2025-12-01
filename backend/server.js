@@ -34,6 +34,7 @@ const io = new Server(server, {
         allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
         credentials: true,
     },
+    path: '/socket.io/',
     transports:['websocket', 'polling'],
     pingTimeout:60000,
     pingInterval:25000,
@@ -101,7 +102,7 @@ app.use((req, res, next) => {
 
 app.get('/users', async (req, res) => {
     try {
-        const users = await UserModel.find({});
+        const users = await UserModel.find();
 
         return res.status(200).json(users)
     } catch (err) {
